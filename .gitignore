@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# venv
+.venv/
+
+# DBs / local data
+*.db
+*.sqlite
+*.sqlite3
+backend/data/leads.db

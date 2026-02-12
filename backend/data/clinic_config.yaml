@@ -1,0 +1,66 @@
+name: Clínica Dental Ejemplo
+address: "C/ Ejemplo 12, Bilbao"
+phone: "+34 600 000 000"
+email: "info@clinicadental.es"
+map_url: "https://maps.google.com/?q=C/+Ejemplo+12+Bilbao"
+
+hours:
+  mon_fri: "09:00–13:30 y 16:00–19:30"
+  sat: "09:30–13:00"
+  sun: "Cerrado"
+
+special_hours:
+  - dates: ["12-24", "12-31"]
+    note: "Solo horario de mañana"
+
+insurances: ["Adeslas", "Sanitas", "Asisa"]
+payments: ["Tarjeta", "Transferencia", "Bizum", "Efectivo"]
+financing: "Financiación disponible hasta 12-24 meses, sujeta a aprobación"
+
+policies:
+  cancellation: "Cancela o reprograma con 24 h de antelación. No-shows pueden tener coste."
+  privacy: "Tratamos tus datos cumpliendo RGPD. Puedes ejercer tus derechos en nuestro email."
+  sterilization: "Esterilización según normativa. Material de un solo uso cuando aplica."
+  emergency: "Atendemos urgencias sin cita siempre que sea posible. Recomendamos llamar antes."
+
+services:
+  treatments:
+    - name: "Limpieza dental"
+      details: "Profilaxis y pulido"
+    - name: "Ortodoncia"
+      details: "Invisalign y brackets metálicos/estéticos"
+    - name: "Implantes"
+      details: "Unitarios y múltiples; carga inmediata cuando procede"
+    - name: "Endodoncia"
+      details: "Piezas anteriores y molares"
+    - name: "Estética dental"
+      details: "Blanqueamiento, carillas y contorneado"
+    - name: "Pediatría"
+      details: "Revisiones, selladores y educación"
+    - name: "Periodoncia"
+      details: "Raspado/curetaje y mantenimiento"
+    - name: "Cirugía oral"
+      details: "Extracciones complejas y cordales"
+
+prices:
+  limpieza: "desde 45 €"
+  blanqueamiento: "desde 180 €"
+  empaste: "60–90 €"
+  endodoncia: "150–220 €"
+  extraccion_simple: "60–90 €"
+  implante_unitario: "750–900 € (sin prótesis)"
+  ortodoncia_invisible: "estudio a medida"
+
+emergency_symptoms:
+  - "dolor intenso que no cede"
+  - "sangrado abundante"
+  - "traumatismo"
+  - "inflamación severa"
+
+diagnosis:
+  first_visit: "Primera visita con evaluación y plan de tratamiento"
+  imaging: ["Radiografías intraorales", "Panorámica si es necesaria"]
+
+parking:
+  street: "Zona OTA cercana"
+  public: "Parking público a 200 m"
