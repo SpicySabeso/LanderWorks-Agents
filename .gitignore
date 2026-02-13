@@ -1,14 +1,26 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
+*.pyd
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# venv
+# Virtualenv
 .venv/
+venv/
 
-# DBs / local data
-*.db
+# Env
+.env
+
+# Local DB / artifacts
+backend/data/leads.db
+backend/data/*.db
+chroma/
 *.sqlite
 *.sqlite3
-backend/data/leads.db
+
+# OS
+.DS_Store
+Thumbs.db
