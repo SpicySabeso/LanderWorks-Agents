@@ -1,7 +1,13 @@
+import os
 import sys
 from pathlib import Path
 
 import pytest
+
+# Desactiva validación Twilio en tests (no hay X-Twilio-Signature)
+os.environ.setdefault("TWILIO_VALIDATE_SIGNATURE", "0")
+# (opcional) asegúrate de no cargar token por accidente
+os.environ.setdefault("TWILIO_AUTH_TOKEN", "")
 
 ROOT = Path(__file__).resolve().parents[1]  # dental-agent/
 if str(ROOT) not in sys.path:

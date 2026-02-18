@@ -9,6 +9,7 @@ from unidecode import unidecode
 
 from .config import settings
 from .metrics import log_event
+from .notify import send_handoff_email
 from .rag import search
 from .store import (
     cleanup_sessions,
@@ -210,6 +211,8 @@ def treatment_may_be_urgent(trat: str | None) -> bool:
         "golpe",
         "inflamacion",
         "inflamación",
+        "fuerte",
+        "dolor fuerte",
     ]
     return any(k in t for k in urgent)
 
@@ -365,6 +368,8 @@ def is_negative(text: str) -> bool:
         "cancelar",
         "cancela",
         "mejor no",
+        # EU
+        "ez",
     }
     if t in negatives:
         return True
@@ -414,6 +419,9 @@ def is_affirmative(text: str) -> bool:
         "desde luego",
         "afirmativo",
         "adelante",
+        # EU
+        "noski",
+        "bai",
         # NUEVOS (confirmación natural)
         "listo",
         "asi listo",
@@ -517,22 +525,60 @@ def is_pure_greeting(text: str) -> bool:
         "qué tal",
         "buen dia",
         "buen día",
+        # EU
+        "kaixo",
+        "egun on",
+        "arratsalde on",
+        "gabon",
+        "Aupi",
+        "Aupa",
+        "Eguerdion",
+        "Eguerdi on",
+        "gab on",
     }
 
-    # exacto
+    # Si contiene palabras que indican intención, NO es saludo puro
+    intent_keywords = [
+        "cita",
+        "horario",
+        "precio",
+        "direccion",
+        "dirección",
+        "telefono",
+        "teléfono",
+        "dolor",
+        "urgente",
+        "urgencia",
+        "consulta",
+        "quiero",
+        "necesito",
+        "tengo",
+    ]
+
+    if any(k in t for k in intent_keywords):
+        return False
+
+    # Exactamente un saludo
     if t in greetings:
         return True
 
-    # compuesto: "hola buenas", "hola, qué tal", etc.
-    for g in greetings:
-        if t.startswith(g + " "):
-            return True
+    # Dos saludos juntos tipo "hola buenas"
+    parts = t.split()
+    if len(parts) <= 3 and all(p in " ".join(greetings) for p in parts):
+        return True
 
     return False
 
 
 _THANKS_RE = re.compile(
-    r"^(?:muchas\s+)?gracias(?:\s+)?(?:!|\.)?$|^gracias\s+(?:tio|tía|crack|majo|genial)?(?:!|\.)?$|^thank(s| you)(?:!|\.)?$",
+    r"^(?:muchas\s+)?gracias(?:\s+)?(?:!|\.)?$"
+    r"|^gracias\s+(?:tio|tía|crack|majo|genial)?(?:!|\.)?$"
+    r"|^thank(s| you)(?:!|\.)?$"
+    r"|^eskerrik\s+asko(?:!|\.)?$"
+    r"|^mila\s+esker(?:!|\.)?$"
+    r"|^eskerrak(?:!|\.)?$"
+    r"|^esker(?:!|\.)?$"
+    r"|^eskerrik(?:!|\.)?$",
     re.IGNORECASE,
 )
 
@@ -541,8 +587,11 @@ def is_thanks(text: str) -> bool:
     t = (text or "").strip().lower()
     t = re.sub(r"\s+", " ", t)
 
-    # combos típicos
-    if re.search(r"\b(ok|vale|perfecto|genial|bien|de acuerdo)\b.*\bgracias\b", t):
+    # combos típicos (ES + EU)
+    if re.search(
+        r"\b(ok|vale|perfecto|genial|bien|de acuerdo)\b.*\b(gracias|eskerrik asko|mila esker|eskerrak|esker)\b",
+        t,
+    ):
         return True
 
     if len(t) > 25:
@@ -578,6 +627,7 @@ def is_goodbye(text: str) -> bool:
         "buenas",
         "chao",
         "chau",
+        "agur",
     }
     return t in goodbyes
 
@@ -857,7 +907,17 @@ def route_message(sender_id: str, user_msg: str, st) -> RouteDecision:
     norm = unidecode(low)
     norm = re.sub(r"\s+", " ", norm).strip()
 
-    # 0) Si el usuario pide humano explícitamente, manda (incluso en booking)
+    # 0) Si ya estamos dentro del flujo de booking, NO salgas a SMALLTALK/FAQ/FALLBACK
+    # Esto evita que un emoji / "ok" / ruido rompa el flujo (tests edge cases).
+    step = getattr(st, "step", "idle")
+    if step in ("name", "phone", "treatment", "urgency", "when"):
+        return RouteDecision("BOOKING", "in_booking_flow")
+
+    # 0.2) Smalltalk ultra-prioritario: si es saludo/thanks/adiós puro, NO lo mandes a booking
+    if is_pure_greeting(raw) or is_thanks(raw) or is_goodbye(raw):
+        return RouteDecision("SMALLTALK", "smalltalk")
+
+    # 0.1) Si el usuario pide humano explícitamente, manda (incluso en booking)
     # (Si quieres que en booking NO corte y solo encole, dime y lo ajustamos)
     if wants_human(raw):
         return RouteDecision("HUMAN_REQUEST", "explicit_human_phrase")
@@ -961,10 +1021,6 @@ def route_message(sender_id: str, user_msg: str, st) -> RouteDecision:
     # J) Humano por intent (aunque no haya frase fuerte)
     if intent == "humano":
         return RouteDecision("HUMAN_REQUEST", "human_intent_classifier")
-
-    # K) Saludos/thanks/goodbye
-    if is_pure_greeting(raw) or is_thanks(raw) or is_goodbye(raw):
-        return RouteDecision("SMALLTALK", "smalltalk")
 
     return RouteDecision("FALLBACK", "default")
 
@@ -1350,18 +1406,31 @@ def handle_smalltalk(sender_id: str, user_msg: str, _out, st) -> tuple[str, list
             t = (text or "").strip().lower()
             t = re.sub(r"[^\w\sáéíóúüñ]", "", t)
 
+            # ES
             if "buenas tardes" in t:
                 return "¡Buenas tardes!"
             if "buenas noches" in t:
                 return "¡Buenas noches!"
             if "buenos dias" in t or "buenos días" in t:
                 return "¡Buenos días!"
+
+            # EU
+            if "kaixo" in t:
+                return "Kaixo!"
+            if "egun on" in t:
+                return "Egun on!"
+            if "arratsalde on" in t:
+                return "Arratsalde on!"
+            if "gabon" in t:
+                return "Gabon!"
+            if "Aupi" in t:
+                return "Aupa!"
             return None
 
         g = greeting_from_user(user_msg) or time_greeting()
         return _out(
             f"{g} ¿En qué puedo ayudarte?\n"
-            "1) Solicitar una cita (Te llamarán para coordinarla)\n"
+            "1) Solicitar una cita (te llamarán para coordinarla)\n"
             "2) Horario / dirección / contacto\n"
             "3) Tengo dolor o una urgencia (te orientamos y avisamos a recepción)",
             [],
@@ -1711,6 +1780,22 @@ def handle_booking(sender: str, user_msg: str) -> tuple[str, list[str]]:
                 "step": st.step,
             },
         )
+        # 2.5) Email notify (no debe romper el flujo)
+        subject = (
+            f"[Dental Agent] Nuevo lead ({st.urgencia or 'normal'}) - {st.nombre or 'Sin nombre'}"
+        )
+        body = (
+            f"Nuevo lead\n"
+            f"- Nombre: {st.nombre}\n"
+            f"- Teléfono: {st.telefono}\n"
+            f"- Motivo: {st.tratamiento}\n"
+            f"- Urgencia: {st.urgencia}\n"
+            f"- Preferencia: {st.preferencia}\n"
+            f"- Sender: {sender}\n"
+        )
+        ok_email = send_handoff_email(subject, body)
+        if not ok_email:
+            print("[EMAIL] send_handoff_email -> False (config incompleta o fallo SMTP)")
 
         # 3) Cerrar flujo automático y dejar en handoff
         try:
@@ -1768,10 +1853,6 @@ def handle_booking(sender: str, user_msg: str) -> tuple[str, list[str]]:
             meta={"kind": "explicit_human", "step": st.step},
         )
 
-        try:
-            st.status = "needs_human"
-        except Exception:
-            pass
         st.faq_interrupts = 0
         st.step = "handoff"
         save_state(sender, st)
@@ -2130,6 +2211,17 @@ def handle_booking(sender: str, user_msg: str) -> tuple[str, list[str]]:
             )
 
         st.tratamiento = clasifica_tratamiento(user_msg) or (user_msg or "").strip().lower()
+        # --- AUTO-URGENCIA: si el mensaje trae síntomas urgentes, no preguntes "¿es urgente?" ---
+        if hay_sintomas_urgentes(user_msg) or treatment_may_be_urgent(st.tratamiento):
+            st.urgencia = "alta"
+            st.step = "when"
+            st.neutral_hits = 0
+            return _hb(
+                "Entendido. Por lo que comentas, conviene valorarlo cuanto antes. "
+                "¿Tienes preferencia de horario? (mañanas/tardes/hoy/mañana o una hora aproximada)",
+                [],
+            )
+        # --- FIN AUTO-URGENCIA ---
 
         # Si el motivo es claramente electivo, no preguntes urgencia
         if treatment_implies_low_urgency(st.tratamiento) and not treatment_may_be_urgent(

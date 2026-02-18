@@ -13,3 +13,4 @@ httpx
 python-multipart
 twilio
 unidecode
+psycopg[binary]

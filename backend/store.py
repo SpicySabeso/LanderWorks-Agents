@@ -10,6 +10,8 @@ from typing import Any
 
 from unidecode import unidecode
 
+import backend.notify as notify
+
 DB_PATH = Path(__file__).resolve().parent / "data" / "leads.db"
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -249,13 +251,13 @@ def _ensure_leads_table(conn: sqlite3.Connection) -> None:
 
 
 def get_conn() -> sqlite3.Connection:
+    # Si algún día migras a Postgres con psycopg, esto cambiará de librería.
+    # PERO: hoy no vamos a reescribir todo. Hoy vamos a DESPLEGAR.
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
-
     _ensure_leads_table(conn)
     _ensure_sessions_table(conn)
     _ensure_handoffs_table(conn)
-
     return conn
 
 
@@ -517,6 +519,14 @@ def enqueue_handoff(
             (sender, message, summary, "open", meta_json, created_at),
         )
         conn.commit()
+        # Notificación por email (best-effort, no rompe)
+        try:
+            subject = f"[Dental Agent] Nuevo Lead ({meta.get('kind','unknown')})"
+            email_body = f"Sender: {sender}\n\n{summary or message}"
+            notify.send_handoff_email(subject, email_body)
+        except Exception:
+            pass
+
         return cur.lastrowid
 
     finally:

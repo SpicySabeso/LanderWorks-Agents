@@ -370,3 +370,37 @@ def test_faq_long_answer_is_trimmed():
 
     assert len(r) <= 950  # margen por saltos, etc.
     assert "…" in r  # indicador de recorte
+
+
+def test_pain_strong_skips_urgency_question():
+    sender = "scenario-auto-urgent-skip"
+    reset_state(sender)
+
+    respond("Quiero cita", sender=sender)
+    respond("Lander", sender=sender)
+    respond("612345678", sender=sender)
+
+    r, _ = respond("Tengo dolor muy fuerte en una muela", sender=sender)
+    st = get_state(sender)
+
+    assert st.urgencia == "alta"
+    assert st.step == "when"
+    assert "preferencia" in (r or "").lower() or "mañanas" in (r or "").lower()
+
+
+def test_euskera_greeting_routes_to_smalltalk():
+    sender = "scenario-eu-greet"
+    reset_state(sender)
+
+    r, _ = respond("Kaixo!", sender=sender)
+    low = (r or "").lower()
+    assert "¿en qué puedo ayudarte" in low
+
+
+def test_euskera_thanks_routes_to_smalltalk():
+    sender = "scenario-eu-thanks"
+    reset_state(sender)
+
+    r, _ = respond("Eskerrik asko", sender=sender)
+    low = (r or "").lower()
+    assert "de nada" in low or "eskerrik" in low or "a ti" in low

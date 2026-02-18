@@ -11,8 +11,9 @@ __pycache__/
 .venv/
 venv/
 
-# Env
+# secrets
 .env
+*.env
 
 # Local DB / artifacts
 backend/data/leads.db
