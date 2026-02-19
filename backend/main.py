@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Header, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
@@ -91,6 +91,7 @@ async def twilio_webhook(request: Request):
 
     try:
         reply, _sources = respond(body, sender=sender)
+        print(f"[TWILIO] From={sender} Body={body!r} Reply={reply!r}")
     except Exception as e:
         print(f"[TWILIO] ERROR respond(): {type(e).__name__}: {e}")
         reply = "Perdona, ha habido un problema técnico. ¿Puedes repetir el mensaje?"
@@ -158,6 +159,16 @@ def admin_test_email():
     ok = send_handoff_email(subject, body)
 
     return {"ok": ok}
+
+
+@app.post("/admin/reset/{sender_id}")
+def admin_reset(sender_id: str, x_admin_token: str = Header(default="")):
+    if x_admin_token != (getattr(settings, "ADMIN_TOKEN", "") or ""):
+        return Response("Forbidden", status_code=403)
+    from .store import reset_state
+
+    reset_state(sender_id)
+    return {"ok": True, "sender": sender_id}
 
 
 @app.get("/admin/debug-route")

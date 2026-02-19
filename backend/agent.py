@@ -1979,7 +1979,12 @@ def handle_booking(sender: str, user_msg: str) -> tuple[str, list[str]]:
         return _hb("Sin problema. Cuando puedas, dime y seguimos con la cita.", [])
 
     # 3) Extracción automática (no pisa lo existente)
-    extracted = extract_booking_fields(user_msg)
+    # IMPORTANTE: en step=name NO llamamos a extract_booking_fields (puede bloquear/LLM/timeout Twilio).
+    if st.step == "name":
+        extracted = {}
+    else:
+        extracted = extract_booking_fields(user_msg)
+
     if not isinstance(extracted, dict):
         extracted = {}
 
