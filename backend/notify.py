@@ -10,25 +10,30 @@ from .config import settings
 
 
 def send_handoff_to_sheets(payload: dict) -> bool:
-    url = (settings.SHEETS_WEBHOOK_URL or "").strip()
-    secret = (settings.SHEETS_WEBHOOK_SECRET or "").strip()
+    url = (getattr(settings, "SHEETS_WEBHOOK_URL", "") or "").strip()
+    secret = (getattr(settings, "SHEETS_WEBHOOK_SECRET", "") or "").strip()
     if not url or not secret:
+        print("[SHEETS] disabled: missing SHEETS_WEBHOOK_URL/SECRET")
         return False
 
-    payload = dict(payload)
-    payload["secret"] = secret
+    data_payload = dict(payload)
+    data_payload["secret"] = secret
 
-    data = json.dumps(payload).encode("utf-8")
+    data = json.dumps(data_payload).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
+
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return 200 <= resp.status < 300
-    except Exception:
+            ok = 200 <= resp.status < 300
+            print(f"[SHEETS] POST status={resp.status} ok={ok}")
+            return ok
+    except Exception as e:
+        print(f"[SHEETS] ERROR: {type(e).__name__}: {e}")
         return False
 
 

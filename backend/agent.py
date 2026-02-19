@@ -1779,8 +1779,23 @@ def handle_booking(sender: str, user_msg: str) -> tuple[str, list[str]]:
                 "step": st.step,
             },
         )
-        # --- EMAIL NOTIFY (no debe romper el flujo JAMÁS) ---
+        # --- NOTIFY (Sheets + Email, nunca rompe el flujo) ---
         try:
+            from .notify import send_handoff_email, send_handoff_to_sheets
+
+            payload = {
+                "kind": "booking_final",
+                "lead_id": lead_id,
+                "nombre": st.nombre,
+                "telefono": st.telefono,
+                "tratamiento": st.tratamiento,
+                "urgencia": st.urgencia,
+                "preferencia": st.preferencia,
+                "sender": sender,
+            }
+
+            sheets_ok = send_handoff_to_sheets(payload)
+
             subject = f"[Dental Agent] Nuevo lead ({st.urgencia or 'normal'}) - {st.nombre or 'Sin nombre'}"
             body = (
                 f"Nuevo lead\n"
@@ -1791,31 +1806,12 @@ def handle_booking(sender: str, user_msg: str) -> tuple[str, list[str]]:
                 f"- Preferencia: {st.preferencia}\n"
                 f"- Sender: {sender}\n"
                 f"- Lead ID: {lead_id}\n"
+                f"- Sheets OK: {sheets_ok}\n"
             )
-            from .notify import send_handoff_email
+            _ = send_handoff_email(subject, body)
 
-            send_handoff_email(subject, body)
         except Exception as e:
-            print(f"[EMAIL] ERROR (ignored): {type(e).__name__}: {e}")
-
-        # --- SHEETS NOTIFY (no debe romper el flujo) ---
-        try:
-            from .notify import send_handoff_to_sheets
-
-            send_handoff_to_sheets(
-                {
-                    "sender": sender,
-                    "lead_id": lead_id,
-                    "nombre": st.nombre,
-                    "telefono": st.telefono,
-                    "tratamiento": st.tratamiento,
-                    "urgencia": st.urgencia,
-                    "preferencia": st.preferencia,
-                    "summary": summary,
-                }
-            )
-        except Exception as e:
-            print(f"[SHEETS] ERROR (ignored): {type(e).__name__}: {e}")
+            print(f"[NOTIFY] ERROR (ignored): {type(e).__name__}: {e}")
 
         # 3) Cerrar flujo automático y dejar en handoff
         try:
