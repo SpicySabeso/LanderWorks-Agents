@@ -10,32 +10,36 @@ from .config import settings
 
 
 def send_handoff_to_sheets(payload: dict) -> bool:
-    url = (getattr(settings, "SHEETS_WEBHOOK_URL", "") or "").strip()
-    secret = (getattr(settings, "SHEETS_WEBHOOK_SECRET", "") or "").strip()
+    url = (settings.SHEETS_WEBHOOK_URL or "").strip()
+    secret = (settings.SHEETS_WEBHOOK_SECRET or "").strip()
     if not url or not secret:
-        print("[SHEETS] disabled: missing SHEETS_WEBHOOK_URL/SECRET")
+        print("[SHEETS] disabled: missing webhook config")
         return False
 
-    data_payload = dict(payload)
-    data_payload["secret"] = secret
+    payload = dict(payload)
+    payload["secret"] = secret
 
-    data = json.dumps(data_payload).encode("utf-8")
+    data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "User-Agent": "dental-agent/1.0"},
         method="POST",
     )
 
-    try:
-        with urllib.request.urlopen(req, timeout=2) as resp:
-            raw = resp.read(5000).decode("utf-8", errors="replace")
-            ok = 200 <= resp.status < 300
-            print(f"[SHEETS] POST status={resp.status} ok={ok} body={raw!r}")
-            return ok
-    except Exception as e:
-        print(f"[SHEETS] ERROR: {type(e).__name__}: {e}")
-        return False
+    # Apps Script a veces tarda (cold start). Dale margen + reintentos.
+    for attempt in range(1, 4):
+        try:
+            with urllib.request.urlopen(req, timeout=25) as resp:
+                ok = 200 <= resp.status < 300
+                print(f"[SHEETS] attempt={attempt} status={resp.status} ok={ok}")
+                return ok
+        except TimeoutError as e:
+            print(f"[SHEETS] attempt={attempt} TIMEOUT: {e}")
+        except Exception as e:
+            print(f"[SHEETS] attempt={attempt} ERROR: {type(e).__name__}: {e}")
+
+    return False
 
 
 def _smtp_connect_ipv4_first(host: str, port: int, timeout: int = 10) -> smtplib.SMTP:
