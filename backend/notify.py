@@ -33,7 +33,16 @@ def send_handoff_to_sheets(payload: dict) -> bool:
             with urllib.request.urlopen(req, timeout=25) as resp:
                 raw = resp.read() or b""
                 text = raw.decode("utf-8", errors="replace")
-                ok = 200 <= resp.status < 300
+
+                ok_http = 200 <= resp.status < 300
+                ok_json = False
+                try:
+                    j = json.loads(text or "{}")
+                    ok_json = bool(j.get("ok") is True)
+                except Exception:
+                    ok_json = False
+
+                ok = bool(ok_http and ok_json)
                 print(f"[SHEETS] attempt={attempt} status={resp.status} ok={ok} body={text[:500]}")
                 return ok
         except TimeoutError as e:
