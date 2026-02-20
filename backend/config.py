@@ -20,13 +20,12 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    SMTP_HOST: str = Field(default="")
-    SMTP_PORT: int = Field(default="587")
-    SMTP_USER: str = Field(default="")
-    SMTP_PASS: str = Field(default="")
-    SMTP_FROM: str = Field(default="")
     NOTIFY_EMAIL_TO: str = Field(default="")
     NOTIFY_EMAIL_SUBJECT: str = Field(default="[Dental Agent] Nuevo Lead")
+
+    # Email via HTTP (Resend)
+    RESEND_API_KEY: str = Field(default="")
+    EMAIL_FROM: str = Field(default="")  # ej: "Dental Agent <onboarding@resend.dev>"
 
 
 settings = Settings()

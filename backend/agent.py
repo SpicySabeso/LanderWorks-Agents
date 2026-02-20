@@ -1808,18 +1808,18 @@ def handle_booking(sender: str, user_msg: str) -> tuple[str, list[str]]:
                 f"- Lead ID: {lead_id}\n"
             )
 
-            def _notify_bg() -> None:
+            def _notify_bg():
                 try:
                     sheets_ok = send_handoff_to_sheets(payload)
                     print(f"[SHEETS] ok={sheets_ok}")
                 except Exception as e:
                     print(f"[SHEETS] ERROR: {type(e).__name__}: {e}")
 
-                try:
-                    email_ok = send_handoff_email(subject, body)
-                    print(f"[EMAIL] ok={email_ok}")
-                except Exception as e:
-                    print(f"[EMAIL] ERROR: {type(e).__name__}: {e}")
+            try:
+                email_ok = send_handoff_email(subject, body)
+                print(f"[EMAIL] ok={email_ok}")
+            except Exception as e:
+                print(f"[EMAIL] ERROR: {type(e).__name__}: {e}")
 
             threading.Thread(target=_notify_bg, daemon=True).start()
 
