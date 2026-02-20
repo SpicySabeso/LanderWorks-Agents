@@ -6,7 +6,7 @@ from backend.store import reset_state
 client = TestClient(app)
 
 
-def test_twilio_webhook_returns_twiml_and_routes_to_agent():
+def test_twilio_webhook_returns_200_and_ack():
     sender = "whatsapp:+34600000000"
     reset_state(sender)
 
@@ -16,7 +16,4 @@ def test_twilio_webhook_returns_twiml_and_routes_to_agent():
     )
 
     assert r.status_code == 200
-    assert "application/xml" in r.headers.get("content-type", "")
-    # TwiML básico
-    assert "<Response>" in r.text
-    assert "<Message>" in r.text
+    assert r.text == "" or r.text is None

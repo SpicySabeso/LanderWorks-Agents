@@ -2,10 +2,9 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Header, Request
+from fastapi import BackgroundTasks, FastAPI, Header, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from twilio.request_validator import RequestValidator
-from twilio.twiml.messaging_response import MessagingResponse
 
 from .agent import respond, route_message
 from .config import settings
@@ -15,6 +14,7 @@ from .rag import ingest_markdown
 from .schemas import ChatIn
 from .store import close_handoff, get_state, list_handoffs
 from .tools import _cfg, _norm_q, validate_config
+from .twilio_worker import process_twilio_message
 
 
 @asynccontextmanager
@@ -84,25 +84,19 @@ def _validate_twilio(request: Request, form: dict) -> bool:
 
 
 @app.post("/webhook/twilio")
-async def twilio_webhook(request: Request):
+async def twilio_webhook(request: Request, background_tasks: BackgroundTasks):
     form = await request.form()
-    body = str(form.get("Body", "")).strip()
-    sender = str(form.get("From", "twilio")).strip()
 
-    try:
-        reply, _sources = respond(body, sender=sender)
-        print(f"[TWILIO] From={sender} Body={body!r} Reply={reply!r}")
-    except Exception as e:
-        print(f"[TWILIO] ERROR respond(): {type(e).__name__}: {e}")
-        reply = "Perdona, ha habido un problema técnico. ¿Puedes repetir el mensaje?"
+    # (opcional pero recomendado)
+    if not _validate_twilio(request, dict(form)):
+        return Response(status_code=403)
 
-    if not reply or not str(reply).strip():
-        reply = "Perdona, no te he leído bien. ¿Puedes repetirlo?"
+    background_tasks.add_task(
+        process_twilio_message,
+        dict(form),
+    )
 
-    twiml = MessagingResponse()
-    twiml.message(str(reply))
-
-    return Response(content=str(twiml), media_type="application/xml")
+    return Response(status_code=200)
 
 
 @app.get("/admin/metrics")
