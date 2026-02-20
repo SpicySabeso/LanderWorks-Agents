@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     # opcional: si validas requests de Twilio
     TWILIO_AUTH_TOKEN: str = Field(default="")
     TWILIO_VALIDATE_SIGNATURE: bool = Field(default=True)
+    TWILIO_ACCOUNT_SID: str = Field(default="")
+    TWILIO_WHATSAPP_FROM: str = Field(default="")  # ej: "whatsapp:+14155238886"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
