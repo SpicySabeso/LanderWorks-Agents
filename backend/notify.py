@@ -9,6 +9,15 @@ from .config import settings
 def send_handoff_to_sheets(payload: dict) -> bool:
     url = (settings.SHEETS_WEBHOOK_URL or "").strip()
     secret = (settings.SHEETS_WEBHOOK_SECRET or "").strip()
+    print(
+        "[SHEETS] cfg",
+        {
+            "url_present": bool(url),
+            "url_host": (url.split("/")[2] if "://" in url else ""),
+            "secret_present": bool(secret),
+            "secret_len": len(secret),
+        },
+    )
     if not url or not secret:
         print("[SHEETS] disabled: missing webhook config")
         return False
@@ -58,6 +67,17 @@ def send_handoff_email(subject: str, body: str) -> bool:
     api_key = (settings.RESEND_API_KEY or "").strip()
     to = (settings.NOTIFY_EMAIL_TO or "").strip()
     sender = (settings.EMAIL_FROM or "").strip() or "Dental Agent <onboarding@resend.dev>"
+
+    print(
+        "[EMAIL] cfg",
+        {
+            "api_key_present": bool(api_key),
+            "api_key_prefix_ok": api_key.startswith("re_"),
+            "api_key_len": len(api_key),
+            "to_present": bool(to),
+            "sender_present": bool(sender),
+        },
+    )
 
     if not (api_key and to):
         print("[EMAIL] disabled: missing RESEND config")
