@@ -508,8 +508,13 @@ def is_indifferent(text: str) -> bool:
 
 
 def is_pure_greeting(text: str) -> bool:
-    t = (text or "").strip().lower()
-    t = re.sub(r"[^\w\sáéíóúüñ]", "", t)
+    raw = (text or "").strip()
+    if not raw:
+        return False
+
+    # Normaliza: minúsculas, sin acentos, sin puntuación rara
+    t = unidecode(raw.lower())
+    t = re.sub(r"[^\w\s]", " ", t)  # quita puntuación / emojis -> espacio
     t = re.sub(r"\s+", " ", t).strip()
 
     greetings = {
@@ -543,9 +548,7 @@ def is_pure_greeting(text: str) -> bool:
         "horario",
         "precio",
         "direccion",
-        "dirección",
         "telefono",
-        "teléfono",
         "dolor",
         "urgente",
         "urgencia",
@@ -553,19 +556,34 @@ def is_pure_greeting(text: str) -> bool:
         "quiero",
         "necesito",
         "tengo",
+        "me duele",
     ]
 
     if any(k in t for k in intent_keywords):
         return False
 
-    # Exactamente un saludo
+    # match exacto
     if t in greetings:
         return True
 
-    # Dos saludos juntos tipo "hola buenas"
+    # combos típicos: "hola buenas", "hola buenos dias", etc.
     parts = t.split()
-    if len(parts) <= 3 and all(p in greetings for p in parts):
-        return True
+    if 1 <= len(parts) <= 3:
+        # Permitimos combinaciones donde cada palabra sea parte de un saludo conocido
+        # (p.ej. ["hola", "buenos", "dias"])
+        # Para esto, permitimos el caso especial "buenos dias"/"buenas tardes"/"buenas noches"
+        joined = " ".join(parts)
+        if joined in greetings:
+            return True
+
+        # Caso: "hola" + ("buenos dias" / "buenas tardes" / "buenas noches" / "buenas")
+        if parts[0] in {"hola", "hey", "holi"}:
+            rest = " ".join(parts[1:])
+            if rest in greetings:
+                return True
+        # Caso: "buenas" + "hola"
+        if parts[-1] in {"hola"} and " ".join(parts[:-1]) in greetings:
+            return True
 
     return False
 
