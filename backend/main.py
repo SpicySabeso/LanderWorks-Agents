@@ -12,7 +12,7 @@ from .metrics import snapshot
 from .notify import send_handoff_email
 from .rag import ingest_markdown
 from .schemas import ChatIn
-from .store import close_handoff, get_state, list_handoffs
+from .store import close_handoff, get_state, list_handoffs, mark_message_processed
 from .tools import _cfg, _norm_q, validate_config
 from .twilio_worker import process_twilio_message
 
@@ -86,6 +86,11 @@ def _validate_twilio(request: Request, form: dict) -> bool:
 @app.post("/webhook/twilio")
 async def twilio_webhook(request: Request, background_tasks: BackgroundTasks):
     form = await request.form()
+
+    # Idempotencia: Twilio puede reintentar el mismo inbound.
+    message_sid = str(form.get("MessageSid", "")).strip()
+    if message_sid and not mark_message_processed(message_sid):
+        return Response(status_code=200)
 
     # (opcional pero recomendado)
     if not _validate_twilio(request, dict(form)):

@@ -10,8 +10,6 @@ from typing import Any
 
 from unidecode import unidecode
 
-import backend.notify as notify
-
 DB_PATH = Path(__file__).resolve().parent / "data" / "leads.db"
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -250,6 +248,18 @@ def _ensure_leads_table(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _ensure_processed_messages_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS processed_messages (
+            sid TEXT PRIMARY KEY,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+
+
 def get_conn() -> sqlite3.Connection:
     # Si algún día migras a Postgres con psycopg, esto cambiará de librería.
     # PERO: hoy no vamos a reescribir todo. Hoy vamos a DESPLEGAR.
@@ -258,6 +268,7 @@ def get_conn() -> sqlite3.Connection:
     _ensure_leads_table(conn)
     _ensure_sessions_table(conn)
     _ensure_handoffs_table(conn)
+    _ensure_processed_messages_table(conn)
     return conn
 
 
@@ -519,13 +530,6 @@ def enqueue_handoff(
             (sender, message, summary, "open", meta_json, created_at),
         )
         conn.commit()
-        # Notificación por email (best-effort, no rompe)
-        try:
-            subject = f"[Dental Agent] Nuevo Lead ({meta.get('kind','unknown')})"
-            email_body = f"Sender: {sender}\n\n{summary or message}"
-            notify.send_handoff_email(subject, email_body)
-        except Exception:
-            pass
 
         return cur.lastrowid
 
@@ -578,3 +582,24 @@ def close_handoff(handoff_id: int) -> bool:
     cur.execute("UPDATE handoffs SET status='closed' WHERE id = ?", (handoff_id,))
     conn.commit()
     return cur.rowcount > 0
+
+
+def mark_message_processed(message_sid: str) -> bool:
+    """
+    Devuelve True si este MessageSid es nuevo.
+    False si ya lo vimos (dedupe).
+    """
+    sid = (message_sid or "").strip()
+    if not sid:
+        return True
+
+    now = datetime.now(UTC).isoformat(timespec="seconds")
+
+    conn = get_conn()  # <-- usa tu función real de conexión
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT OR IGNORE INTO processed_messages (sid, created_at) VALUES (?, ?)",
+        (sid, now),
+    )
+    conn.commit()
+    return cur.rowcount == 1

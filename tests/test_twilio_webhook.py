@@ -1,24 +1,29 @@
 from fastapi.testclient import TestClient
 
-import backend.twilio_client as twilio_client
-from backend.main import app
+import backend.main as mainmod
 from backend.store import reset_state
 
-twilio_client.settings.TWILIO_WHATSAPP_FROM = ""
-twilio_client.settings.TWILIO_ACCOUNT_SID = ""
-twilio_client.settings.TWILIO_AUTH_TOKEN = ""
-
-client = TestClient(app)
+client = TestClient(mainmod.app)
 
 
-def test_twilio_webhook_returns_200_and_ack():
+def test_twilio_webhook_returns_200_and_enqueues_processing(monkeypatch):
     sender = "whatsapp:+34600000000"
     reset_state(sender)
 
+    called = {"n": 0, "form": None}
+
+    def fake_process(form: dict):
+        called["n"] += 1
+        called["form"] = form
+
+    monkeypatch.setattr(mainmod, "process_twilio_message", fake_process)
+
     r = client.post(
         "/webhook/twilio",
-        data={"Body": "Quiero cita", "From": sender},
+        data={"Body": "Quiero cita", "From": sender, "MessageSid": "SM_TEST_1"},
     )
 
     assert r.status_code == 200
-    assert r.text == "" or r.text is None
+    assert called["n"] == 1
+    assert called["form"]["Body"] == "Quiero cita"
+    assert called["form"]["From"] == sender
