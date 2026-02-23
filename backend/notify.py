@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import urllib.error
 import urllib.request
 
 from .config import settings
@@ -107,6 +108,14 @@ def send_handoff_email(subject: str, body: str) -> bool:
             ok = 200 <= resp.status < 300
             print(f"[EMAIL] status={resp.status} ok={ok}")
             return ok
+    except urllib.error.HTTPError as e:
+        try:
+            raw = e.read() or b""
+            text = raw.decode("utf-8", errors="replace")
+        except Exception:
+            text = "<no body>"
+        print(f"[EMAIL] HTTPError status={e.code} body={text[:500]}")
+        return False
     except Exception as e:
         print(f"[EMAIL] ERROR sending email via HTTP: {type(e).__name__}: {e}")
         return False
