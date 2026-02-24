@@ -25,6 +25,14 @@ policies:
 
 services:
   treatments:
+    - name: "Consulta / valoración inicial"
+      details: "Consulta o valoracion inicial con diagnóstico y plan de tratamiento"
+    - name: "Radiografía simple"
+      details: "Radiografía intraoral simple"
+    - name: "Panorámica dental / Scanner 3D"
+      details: "Panorámica dental o escáner 3D de mandíbula"
+    - name: "Reconstrucción dental"
+      details: "Reconstrucción de piezas dentales con materiales biocompatibles"
     - name: "Limpieza dental"
       details: "Profilaxis y pulido"
     - name: "Ortodoncia"
@@ -41,8 +49,15 @@ services:
       details: "Raspado/curetaje y mantenimiento"
     - name: "Cirugía oral"
       details: "Extracciones complejas y cordales"
+    - name: "Empaste"
+      details: "Empaste de composite o amalgama según necesidad"  
 
 prices:
+  Consulta / valoración inicial: "30–60 €"
+  Radiografía simple: "5–50 €"
+  Panorámica dental / Scanner 3D: "40–120 €"
+  Limpieza dental (profilaxis): "40–85 €"
+  Higiene profunda / raspado periodontal: "60–120 €"  
   limpieza: "desde 45 €"
   blanqueamiento: "desde 180 €"
   empaste: "60–90 €"
@@ -50,6 +65,8 @@ prices:
   extraccion_simple: "60–90 €"
   implante_unitario: "750–900 € (sin prótesis)"
   ortodoncia_invisible: "estudio a medida"
+  Reconstrucciones complejas: "80–150 €"
+  Selladores preventivos: "30–50 €"
 
 emergency_symptoms:
   - "dolor intenso que no cede"
