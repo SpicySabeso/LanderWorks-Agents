@@ -77,7 +77,7 @@ def test_api_sends_email_on_yes(monkeypatch, tmp_path):
 
     r1 = client.post(
         "/scaffold-agent/chat",
-        json={"session_id": sid, "message": "Hello"},
+        json={"session_id": sid, "message": "Need quotation FOB Ningbo, MOQ?"},
         headers=headers,
     )
     assert r1.status_code == 200, r1.text
@@ -95,7 +95,10 @@ def test_api_sends_email_on_yes(monkeypatch, tmp_path):
 
     r3 = client.post(
         "/scaffold-agent/chat",
-        json={"session_id": sid, "message": "Need quotation FOB Ningbo, MOQ?"},
+        json={
+            "session_id": sid,
+            "message": "Ringlock, 500 sqm, delivery to Bilbao, Spain. Need in 2 weeks.",
+        },
         headers=headers,
     )
     assert r3.status_code == 200, r3.text
@@ -112,11 +115,13 @@ def test_api_sends_email_on_yes(monkeypatch, tmp_path):
     assert data["step"] == "done"
 
     assert len(fake_mailer.sent) == 1
-
-    to, subject, body = fake_mailer.sent[0]
-    assert to == "inbox@scaffold.com"
-    assert "Scaffold Web Agent" in subject
-    assert "New web inquiry" in body
+    to_email, subject, body = fake_mailer.sent[0]
+    assert to_email == "inbox@scaffold.com"
+    assert subject == "[Scaffold Web Agent] pricing_quote"
+    assert "New B2B web inquiry" in body
+    assert "Inquiry type: pricing_quote" in body
+    assert "Request summary: Hello" in body or "Request summary:" in body
+    assert "Email: buyer@company.com" in body
 
     app.dependency_overrides = {}
 

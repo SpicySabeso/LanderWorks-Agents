@@ -76,11 +76,11 @@ def _valid_email(email: str) -> bool:
 def _build_summary(state: SessionState) -> str:
     d = state.data
     lines = []
-    lines.append("New web inquiry (scaffolding / importing)")
+    lines.append("New B2B web inquiry")
     lines.append("")
-    lines.append(f"Category: {d.category.value if d.category else 'unknown'}")
+    lines.append(f"Inquiry type: {d.category.value if d.category else 'unknown'}")
     lines.append(f"Urgency: {d.urgency.value if d.urgency else 'unknown'}")
-    lines.append(f"Topic: {d.topic or '—'}")
+    lines.append(f"Request summary: {d.topic or '—'}")
     lines.append("")
     lines.append("Contact")
     lines.append(f"- Name: {d.contact_name or '—'}")
@@ -137,10 +137,16 @@ def handle_user_message(state: SessionState, user_text: str) -> tuple[SessionSta
             state.data.urgency = _infer_urgency(text)
             state.data.topic = text[:80] if len(text) <= 80 else (text[:77] + "…")
 
-        new_state = replace(state, step=Step.COLLECT_CONTACT)
-        return new_state, (
-            "Hi — I can help route your inquiry to our team.\n"
-            "First, what’s your email so we can reply?"
+            new_state = replace(state, step=Step.COLLECT_CONTACT)
+            return new_state, (
+                "Hi — I can help route your inquiry to our team.\n"
+                "First, what’s your email so we can reply?"
+            )
+
+        return state, (
+            "Hi 👋\n"
+            "I can help with product inquiries, quotations, MOQ/Incoterms, shipping, documents, and issues.\n\n"
+            "What do you need?"
         )
 
     if state.step == Step.COLLECT_CONTACT:
