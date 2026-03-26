@@ -104,6 +104,17 @@ def _ready_for_confirm(state: SessionState) -> bool:
     return bool(d.category and d.topic and d.details and d.email and _valid_email(d.email))
 
 
+def _details_prompt() -> str:
+    return (
+        "Great — to prepare an accurate quote, please add the key details in one message:\n"
+        "- Scaffold type/model (e.g., ringlock/cuplock/frame)\n"
+        "- Dimensions / quantities\n"
+        "- Delivery country / city\n"
+        "- Any deadlines\n"
+        "You can also paste links to photos/documents."
+    )
+
+
 def handle_user_message(state: SessionState, user_text: str) -> tuple[SessionState, str]:
     """
     Pure function: takes current state + user message, returns (new_state, assistant_reply).
@@ -121,6 +132,11 @@ def handle_user_message(state: SessionState, user_text: str) -> tuple[SessionSta
         )
 
     if state.step == Step.START:
+        if text:
+            state.data.category = _classify_category(text)
+            state.data.urgency = _infer_urgency(text)
+            state.data.topic = text[:80] if len(text) <= 80 else (text[:77] + "…")
+
         new_state = replace(state, step=Step.COLLECT_CONTACT)
         return new_state, (
             "Hi — I can help route your inquiry to our team.\n"
@@ -139,6 +155,10 @@ def handle_user_message(state: SessionState, user_text: str) -> tuple[SessionSta
         if email:
             state.data.email = email
             new_state = replace(state, step=Step.COLLECT_CASE)
+
+            if state.data.topic:
+                return new_state, _details_prompt()
+
             return new_state, (
                 "Thanks. What do you need help with?\n"
                 "Examples: product info, quotation (MOQ/Incoterms), shipping/lead time, compliance documents, or an after-sales issue."
@@ -147,31 +167,19 @@ def handle_user_message(state: SessionState, user_text: str) -> tuple[SessionSta
         return state, "Please share a valid email address (e.g., name@company.com)."
 
     if state.step == Step.COLLECT_CASE:
-        # First message in this step: classify + ask for structured details
         if not state.data.category:
             state.data.category = _classify_category(text)
             state.data.urgency = _infer_urgency(text)
 
-        # Ask for topic + details in a single shot (avoid back-and-forth)
         if not state.data.topic:
             state.data.topic = text[:80] if len(text) <= 80 else (text[:77] + "…")
-            return state, (
-                "Got it. Please add the key details in one message:\n"
-                "- Scaffold type/model (e.g., ringlock/cuplock/frame)\n"
-                "- Dimensions / quantities\n"
-                "- Delivery country / city\n"
-                "- Any deadlines\n"
-                "You can also paste links to photos/documents."
-            )
+            return state, _details_prompt()
 
-        # Now treat the next message as details
         if not state.data.details:
             state.data.details = text
-            # attachments: crude URL extraction
             urls = re.findall(r"https?://\S+", text)
             state.data.attachments.extend([u.strip(" ,;.") for u in urls])
 
-        # If ready, go to confirm
         if _ready_for_confirm(state):
             state.data.summary = _build_summary(state)
             state.data.status = Status.READY_TO_SEND
@@ -182,7 +190,6 @@ def handle_user_message(state: SessionState, user_text: str) -> tuple[SessionSta
                 "Reply YES to send, or NO to add more details."
             )
 
-        # Missing something critical
         if not state.data.email or not _valid_email(state.data.email):
             new_state = replace(state, step=Step.COLLECT_CONTACT)
             return new_state, "Before I send it, what’s the best email to reach you?"

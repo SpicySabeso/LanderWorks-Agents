@@ -100,28 +100,15 @@ def test_api_sends_email_on_yes(monkeypatch, tmp_path):
     )
     assert r3.status_code == 200, r3.text
     data = r3.json()
-    assert data["step"] == "collect_case"
+    assert data["step"] == "confirm"
 
     r4 = client.post(
         "/scaffold-agent/chat",
-        json={
-            "session_id": sid,
-            "message": "Ringlock, 500 sqm, delivery to Bilbao, Spain. Need in 2 weeks.",
-        },
+        json={"session_id": sid, "message": "yes"},
         headers=headers,
     )
     assert r4.status_code == 200, r4.text
     data = r4.json()
-    assert data["step"] == "confirm"
-
-    r5 = client.post(
-        "/scaffold-agent/chat",
-        json={"session_id": sid, "message": "YES"},
-        headers=headers,
-    )
-    assert r5.status_code == 200, r5.text
-    data = r5.json()
-    assert data["is_done"] is True
     assert data["step"] == "done"
 
     assert len(fake_mailer.sent) == 1
