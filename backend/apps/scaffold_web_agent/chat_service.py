@@ -58,14 +58,14 @@ class ChatApplicationService:
         )
 
         state = self._session_service.get_state(tenant.tenant_id, session_id)
-        context_message = message
+        new_state, reply = handle_user_message(state, message)
 
-        if tenant.knowledge_text:
-            context_message = (
-                f"[CLIENT KNOWLEDGE]\n{tenant.knowledge_text}\n\n" f"[USER MESSAGE]\n{message}"
-            )
-
-        new_state, reply = handle_user_message(state, context_message)
+        # Soft knowledge injection: add one short line of tenant context
+        # to the first assistant reply, without polluting state or summary.
+        if tenant.knowledge_text and state.step == Step.START:
+            intro = tenant.knowledge_text.splitlines()[0].strip()
+            if intro:
+                reply = f"{reply}\n\nAbout us: {intro}"
 
         self._event_service.record(
             tenant_id=tenant.tenant_id,

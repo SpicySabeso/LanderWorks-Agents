@@ -31,14 +31,17 @@ class DummyMailer:
         pass
 
 
-def test_chat_service_injects_knowledge_into_message(monkeypatch):
+def test_chat_service_adds_knowledge_to_reply_without_polluting_message(monkeypatch):
     captured = {}
 
     def fake_handle_user_message(state, message):
         captured["message"] = message
         new_state = SessionState()
-        new_state.step = Step.CONFIRM
-        return new_state, "ok"
+        new_state.step = Step.COLLECT_CONTACT
+        return (
+            new_state,
+            "Hi — I can help route your inquiry to our team.\nFirst, what’s your email so we can reply?",
+        )
 
     monkeypatch.setattr(
         "backend.apps.scaffold_web_agent.chat_service.handle_user_message",
@@ -63,21 +66,18 @@ def test_chat_service_injects_knowledge_into_message(monkeypatch):
         subject_prefix="[X]",
         allowed_origins=[],
         agent_type="scaffold_web_agent",
-        knowledge_text="Horario: L-V 9-18",
+        knowledge_text="We are a scaffolding supplier for international buyers.",
     )
 
     result = service.process_chat(
         tenant=tenant,
         client_ip="127.0.0.1",
         session_id="sess-1",
-        message="¿Cuál es el horario?",
+        message="I need a quotation",
         mailer=DummyMailer(),
     )
 
-    assert result.reply == "ok"
-    assert result.step == "confirm"
+    assert captured["message"] == "I need a quotation"
+    assert "We are a scaffolding supplier for international buyers." in result.reply
+    assert result.step == "collect_contact"
     assert result.is_done is False
-    assert "[CLIENT KNOWLEDGE]" in captured["message"]
-    assert "Horario: L-V 9-18" in captured["message"]
-    assert "[USER MESSAGE]" in captured["message"]
-    assert "¿Cuál es el horario?" in captured["message"]
