@@ -24,6 +24,8 @@ REPLACEMENTS = [
     ("from backend.config import", "from backend.agents.dental_agent.config import"),
     ("from backend import tools", "from backend.agents.dental_agent import tools"),
     ("from backend.tools import", "from backend.agents.dental_agent.tools import"),
+    ("backend.agents.scaffold_web_agent.", "backend.agents.lead_capture_agent."),
+    ("backend/agents/scaffold_web_agent", "backend/agents/lead_capture_agent"),
 ]
 
 # Archivos a procesar

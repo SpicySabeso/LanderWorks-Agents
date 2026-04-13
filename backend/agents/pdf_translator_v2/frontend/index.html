@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Translator v2 — LangGraph Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap"
+    rel="stylesheet" />
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --white: #f5f2ed;
+      --accent: #d4ff00;
+      --accent2: #ff6b35;
+      --muted: #3a3a3a;
+      --border: #222;
+      --glass: rgba(255, 255, 255, 0.03);
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--black);
+      color: var(--white);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: linear-gradient(rgba(212, 255, 0, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(212, 255, 0, 0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    header {
+      position: relative;
+      z-index: 10;
+      padding: 2.5rem 3rem 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .logo span {
+      color: var(--accent);
+    }
+
+    .badge {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 0.3rem 0.7rem;
+      border-radius: 100px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      animation: pulse-border 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse-border {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(212, 255, 0, 0.3)
+      }
+
+      50% {
+        box-shadow: 0 0 0 6px rgba(212, 255, 0, 0)
+      }
+    }
+
+    .hero {
+      position: relative;
+      z-index: 10;
+      padding: 5rem 3rem 3rem;
+      max-width: 900px;
+    }
+
+    .hero-eyebrow {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--accent);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .hero-eyebrow::before {
+      content: '';
+      width: 30px;
+      height: 1px;
+      background: var(--accent);
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(3rem, 7vw, 6rem);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+      margin-bottom: 1.5rem;
+    }
+
+    h1 .line2 {
+      color: transparent;
+      -webkit-text-stroke: 1px rgba(245, 242, 237, 0.3);
+    }
+
+    h1 .accent {
+      color: var(--accent);
+    }
+
+    .hero-sub {
+      font-size: 1rem;
+      color: rgba(245, 242, 237, 0.5);
+      font-weight: 300;
+      line-height: 1.7;
+      max-width: 520px;
+    }
+
+    main {
+      position: relative;
+      z-index: 10;
+      padding: 1rem 3rem 4rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      max-width: 1100px;
+    }
+
+    @media(max-width:768px) {
+      main {
+        grid-template-columns: 1fr;
+        padding: 1rem 1.5rem 4rem
+      }
+
+      header {
+        padding: 1.5rem
+      }
+
+      .hero {
+        padding: 3rem 1.5rem 1.5rem
+      }
+    }
+
+    .card {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2rem;
+      backdrop-filter: blur(8px);
+      transition: border-color 0.3s;
+    }
+
+    .card:hover {
+      border-color: #333;
+    }
+
+    .card-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.65rem;
+      color: rgba(245, 242, 237, 0.3);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 1.5rem;
+    }
+
+    .drop-zone {
+      border: 1.5px dashed var(--border);
+      border-radius: 4px;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .drop-zone::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(212, 255, 0, 0.04) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(212, 255, 0, 0.03);
+    }
+
+    .drop-zone:hover::before,
+    .drop-zone.dragover::before {
+      opacity: 1;
+    }
+
+    .drop-icon {
+      font-size: 2.5rem;
+      margin-bottom: 0.8rem;
+      display: block;
+    }
+
+    .drop-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .drop-hint {
+      font-size: 0.8rem;
+      color: rgba(245, 242, 237, 0.35);
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    #file-input {
+      display: none;
+    }
+
+    .file-selected {
+      display: none;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.2rem;
+      background: rgba(212, 255, 0, 0.06);
+      border: 1px solid rgba(212, 255, 0, 0.2);
+      border-radius: 4px;
+      margin-top: 1rem;
+    }
+
+    .file-selected.show {
+      display: flex;
+    }
+
+    .file-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .file-name {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--accent);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-size {
+      font-size: 0.7rem;
+      color: rgba(245, 242, 237, 0.4);
+      margin-top: 0.2rem;
+    }
+
+    .remove-file {
+      background: none;
+      border: none;
+      color: rgba(245, 242, 237, 0.3);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.3rem;
+      transition: color 0.2s;
+    }
+
+    .remove-file:hover {
+      color: var(--accent2);
+    }
+
+    .lang-section {
+      margin-top: 1.5rem;
+    }
+
+    .lang-label {
+      font-size: 0.75rem;
+      color: rgba(245, 242, 237, 0.5);
+      margin-bottom: 0.8rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .lang-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+
+    .lang-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: rgba(245, 242, 237, 0.5);
+      border-radius: 3px;
+      padding: 0.55rem 0.4rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'Inter', sans-serif;
+      text-align: center;
+    }
+
+    .lang-btn:hover {
+      border-color: rgba(212, 255, 0, 0.4);
+      color: var(--white);
+    }
+
+    .lang-btn.selected {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--black);
+      font-weight: 600;
+    }
+
+    /* Quality setting */
+    .quality-section {
+      margin-top: 1.5rem;
+    }
+
+    .quality-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .quality-track {
+      flex: 1;
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .qa-btn {
+      flex: 1;
+      background: none;
+      border: 1px solid var(--border);
+      color: rgba(245, 242, 237, 0.4);
+      border-radius: 3px;
+      padding: 0.5rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .qa-btn:hover {
+      border-color: rgba(212, 255, 0, 0.3);
+      color: var(--white);
+    }
+
+    .qa-btn.selected {
+      background: rgba(212, 255, 0, 0.1);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .qa-desc {
+      font-size: 0.7rem;
+      color: rgba(245, 242, 237, 0.3);
+      margin-top: 0.5rem;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .progress-wrap {
+      display: none;
+      height: 2px;
+      background: var(--border);
+      border-radius: 100px;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .progress-wrap.show {
+      display: block;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.5s ease;
+      border-radius: 100px;
+    }
+
+    .translate-btn {
+      margin-top: 2rem;
+      width: 100%;
+      padding: 1rem 1.5rem;
+      background: var(--accent);
+      color: var(--black);
+      border: none;
+      border-radius: 3px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .translate-btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.6s, height 0.6s;
+    }
+
+    .translate-btn:hover::before {
+      width: 400px;
+      height: 400px;
+    }
+
+    .translate-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 30px rgba(212, 255, 0, 0.25);
+    }
+
+    .translate-btn:disabled {
+      background: var(--muted);
+      color: rgba(245, 242, 237, 0.3);
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Pipeline */
+    .status-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1.2rem 0;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+
+    .step:last-child {
+      border-bottom: none;
+    }
+
+    .step-num {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.65rem;
+      color: rgba(245, 242, 237, 0.2);
+      width: 20px;
+      flex-shrink: 0;
+      padding-top: 0.15rem;
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 0.3rem;
+      color: rgba(245, 242, 237, 0.5);
+      transition: color 0.3s;
+    }
+
+    .step-desc {
+      font-size: 0.75rem;
+      color: rgba(245, 242, 237, 0.25);
+      line-height: 1.5;
+    }
+
+    .step-status {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.65rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 100px;
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      color: rgba(245, 242, 237, 0.2);
+      transition: all 0.3s;
+    }
+
+    .step.active .step-name {
+      color: var(--white);
+    }
+
+    .step.active .step-status {
+      color: var(--accent);
+      border-color: var(--accent);
+      animation: blink 1.2s ease-in-out infinite;
+    }
+
+    .step.done .step-name {
+      color: rgba(212, 255, 0, 0.8);
+    }
+
+    .step.done .step-status {
+      background: rgba(212, 255, 0, 0.1);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .step.retry .step-name {
+      color: #ff9f0a;
+    }
+
+    .step.retry .step-status {
+      color: #ff9f0a;
+      border-color: #ff9f0a;
+      animation: blink 0.8s ease-in-out infinite;
+    }
+
+    .step.error .step-name {
+      color: var(--accent2);
+    }
+
+    .step.error .step-status {
+      color: var(--accent2);
+      border-color: var(--accent2);
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0.4
+      }
+    }
+
+    /* QA loop indicator */
+    .qa-loop {
+      display: none;
+      margin: 0.5rem 0;
+      padding: 0.6rem 1rem;
+      background: rgba(255, 159, 10, 0.08);
+      border: 1px solid rgba(255, 159, 10, 0.2);
+      border-radius: 3px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.7rem;
+      color: #ff9f0a;
+    }
+
+    .qa-loop.show {
+      display: block;
+    }
+
+    .idle-msg {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+      border: 1px dashed var(--border);
+      border-radius: 4px;
+      gap: 0.8rem;
+      min-height: 200px;
+    }
+
+    .idle-msg span {
+      font-size: 2rem;
+      opacity: 0.3;
+    }
+
+    .idle-msg p {
+      font-size: 0.8rem;
+      color: rgba(245, 242, 237, 0.25);
+      font-family: 'IBM Plex Mono', monospace;
+    }
+
+    .result-box {
+      display: none;
+      background: rgba(212, 255, 0, 0.05);
+      border: 1px solid rgba(212, 255, 0, 0.2);
+      border-radius: 4px;
+      padding: 1.5rem;
+    }
+
+    .result-box.show {
+      display: block;
+    }
+
+    .result-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin-bottom: 1rem;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.8rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .stat {
+      text-align: center;
+      padding: 0.8rem;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 3px;
+    }
+
+    .stat-val {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.4rem;
+      color: var(--white);
+    }
+
+    .stat-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.6rem;
+      color: rgba(245, 242, 237, 0.35);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 0.2rem;
+    }
+
+    .download-btn {
+      width: 100%;
+      padding: 0.9rem;
+      background: var(--accent);
+      color: var(--black);
+      border: none;
+      border-radius: 3px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: block;
+      text-align: center;
+    }
+
+    .download-btn:hover {
+      box-shadow: 0 6px 20px rgba(212, 255, 0, 0.3);
+    }
+
+    .error-box {
+      display: none;
+      background: rgba(255, 107, 53, 0.06);
+      border: 1px solid rgba(255, 107, 53, 0.25);
+      border-radius: 4px;
+      padding: 1.2rem 1.5rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--accent2);
+      line-height: 1.6;
+    }
+
+    .error-box.show {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="logo">PDF<span>.</span>TRANSLATOR <span style="font-size:0.7rem;opacity:0.5">v2</span></div>
+    <div class="badge">LangGraph · Quality Gate</div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-eyebrow">Multi-Agent LangGraph Pipeline</div>
+    <h1>
+      Translate<br />
+      <span class="line2">any PDF</span><br />
+      <span class="accent">with quality</span>
+    </h1>
+    <p class="hero-sub">
+      Powered by LangGraph. The agent analyzes, translates, verifies quality,
+      retries if needed — and only delivers when it's right.
+    </p>
+  </section>
+
+  <main>
+    <!-- LEFT: Upload + Config -->
+    <div class="card">
+      <div class="card-label">01 — Upload & Configure</div>
+
+      <div class="drop-zone" id="drop-zone">
+        <span class="drop-icon">📄</span>
+        <div class="drop-title">Drop your PDF here</div>
+        <div class="drop-hint">or click to browse · max 50MB</div>
+        <input type="file" id="file-input" accept=".pdf" />
+      </div>
+
+      <div class="file-selected" id="file-selected">
+        <div style="font-size:1.5rem;flex-shrink:0">📋</div>
+        <div class="file-info">
+          <div class="file-name" id="file-name">—</div>
+          <div class="file-size" id="file-size">—</div>
+        </div>
+        <button class="remove-file" id="remove-file">✕</button>
+      </div>
+
+      <div class="lang-section">
+        <div class="lang-label">Target Language</div>
+        <div class="lang-grid" id="lang-grid"></div>
+      </div>
+
+      <div class="quality-section">
+        <div class="lang-label">Quality Gate Iterations</div>
+        <div class="quality-track" id="qa-track">
+          <button class="qa-btn" data-qa="1">1× <span style="opacity:0.6">fast</span></button>
+          <button class="qa-btn selected" data-qa="2">2× <span style="opacity:0.6">balanced</span></button>
+          <button class="qa-btn" data-qa="3">3× <span style="opacity:0.6">best</span></button>
+        </div>
+        <div class="qa-desc" id="qa-desc">Balanced: translates, verifies quality, retries once if needed</div>
+      </div>
+
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+
+      <button class="translate-btn" id="translate-btn" disabled>Translate PDF →</button>
+    </div>
+
+    <!-- RIGHT: Pipeline status -->
+    <div class="card status-panel">
+      <div class="card-label">02 — LangGraph Pipeline</div>
+
+      <div class="idle-msg" id="idle-msg">
+        <span>⚡</span>
+        <p>Upload a PDF to start the<br />LangGraph translation pipeline</p>
+      </div>
+
+      <div class="pipeline" id="pipeline" style="display:none">
+        <div class="step" id="step-1">
+          <div class="step-num">01</div>
+          <div class="step-content">
+            <div class="step-name">Analyzer Node</div>
+            <div class="step-desc">Classifies every element: native text,<br />image+text, or image-only</div>
+          </div>
+          <div class="step-status" id="status-1">waiting</div>
+        </div>
+        <div class="step" id="step-2">
+          <div class="step-num">02</div>
+          <div class="step-content">
+            <div class="step-name">Translator Node</div>
+            <div class="step-desc">Batch-translates with Claude Haiku.<br />Haiku for text, Sonnet for Vision</div>
+          </div>
+          <div class="step-status" id="status-2">waiting</div>
+        </div>
+        <div class="step" id="step-3">
+          <div class="step-num">03</div>
+          <div class="step-content">
+            <div class="step-name">Quality Gate Node</div>
+            <div class="step-desc">Verifies completeness, language,<br />length ratio &amp; font fit</div>
+          </div>
+          <div class="step-status" id="status-3">waiting</div>
+        </div>
+        <div id="qa-loop-indicator" class="qa-loop"></div>
+        <div class="step" id="step-4">
+          <div class="step-num">04</div>
+          <div class="step-content">
+            <div class="step-name">Reconstructor Node</div>
+            <div class="step-desc">Rebuilds PDF with quality-approved<br />translations &amp; optimal font sizes</div>
+          </div>
+          <div class="step-status" id="status-4">waiting</div>
+        </div>
+      </div>
+
+      <div class="result-box" id="result-box">
+        <div class="result-title">✓ Translation Complete</div>
+        <div class="stats-grid">
+          <div class="stat">
+            <div class="stat-val" id="stat-pages">—</div>
+            <div class="stat-label">Pages</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="stat-blocks">—</div>
+            <div class="stat-label">Elements</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="stat-qa">—</div>
+            <div class="stat-label">QA loops</div>
+          </div>
+          <div class="stat">
+            <div class="stat-val" id="stat-time">—</div>
+            <div class="stat-label">Seconds</div>
+          </div>
+        </div>
+        <a class="download-btn" id="download-btn" href="#" download>↓ Download Translated PDF</a>
+      </div>
+
+      <div class="error-box" id="error-box"></div>
+    </div>
+  </main>
+
+  <script>
+    const API_BASE = window.location.origin;
+    let selectedFile = null;
+    let selectedLanguage = null;
+    let selectedQA = 2;
+
+    const LANGUAGES = {
+      spanish: "Español", english: "English", french: "Français",
+      german: "Deutsch", italian: "Italiano", portuguese: "Português",
+      dutch: "Nederlands", polish: "Polski", russian: "Русский",
+      chinese: "中文", japanese: "日本語", catalan: "Català",
+    };
+
+    const QA_DESCS = {
+      1: "Fast: single pass — translate and deliver",
+      2: "Balanced: translates, verifies quality, retries once if needed",
+      3: "Best quality: up to 3 translation attempts with verification",
+    };
+
+    // Build language grid
+    const langGrid = document.getElementById('lang-grid');
+    Object.entries(LANGUAGES).forEach(([key, label]) => {
+      const btn = document.createElement('button');
+      btn.className = 'lang-btn';
+      btn.dataset.lang = key;
+      btn.textContent = label;
+      btn.addEventListener('click', () => selectLanguage(key));
+      langGrid.appendChild(btn);
+    });
+
+    // QA track
+    document.querySelectorAll('.qa-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.qa-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedQA = parseInt(btn.dataset.qa);
+        document.getElementById('qa-desc').textContent = QA_DESCS[selectedQA];
+      });
+    });
+
+    function selectLanguage(lang) {
+      selectedLanguage = lang;
+      document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('selected', b.dataset.lang === lang));
+      updateBtn();
+    }
+
+    // Drop zone
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); const f = e.dataTransfer.files[0]; if (f?.type === 'application/pdf') setFile(f); });
+    fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+    function setFile(f) {
+      selectedFile = f;
+      document.getElementById('file-name').textContent = f.name;
+      document.getElementById('file-size').textContent = formatBytes(f.size);
+      document.getElementById('file-selected').classList.add('show');
+      updateBtn();
+    }
+
+    document.getElementById('remove-file').addEventListener('click', () => {
+      selectedFile = null; fileInput.value = '';
+      document.getElementById('file-selected').classList.remove('show');
+      updateBtn();
+    });
+
+    function formatBytes(b) {
+      if (b < 1024) return b + ' B';
+      if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+      return (b / 1048576).toFixed(1) + ' MB';
+    }
+
+    const translateBtn = document.getElementById('translate-btn');
+    function updateBtn() { translateBtn.disabled = !(selectedFile && selectedLanguage); }
+
+    function setStep(n, state, label) {
+      const step = document.getElementById(`step-${n}`);
+      const status = document.getElementById(`status-${n}`);
+      if (!step) return;
+      step.className = `step ${state}`;
+      status.textContent = label;
+    }
+
+    function resetPipeline() {
+      for (let i = 1; i <= 4; i++) setStep(i, '', 'waiting');
+      document.getElementById('qa-loop-indicator').classList.remove('show');
+    }
+
+    translateBtn.addEventListener('click', startTranslation);
+
+    async function startTranslation() {
+      if (!selectedFile || !selectedLanguage) return;
+
+      resetPipeline();
+      document.getElementById('idle-msg').style.display = 'none';
+      document.getElementById('pipeline').style.display = 'flex';
+      document.getElementById('result-box').classList.remove('show');
+      document.getElementById('error-box').classList.remove('show');
+      translateBtn.disabled = true;
+      translateBtn.textContent = 'Translating...';
+
+      const progressWrap = document.getElementById('progress-wrap');
+      const progressBar = document.getElementById('progress-bar');
+      progressWrap.classList.add('show');
+
+      // Animate steps
+      setStep(1, 'active', 'running...');
+      progressBar.style.width = '15%';
+
+      await sleep(1200);
+      setStep(1, 'done', 'done ✓');
+      setStep(2, 'active', 'running...');
+      progressBar.style.width = '35%';
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('target_language', selectedLanguage);
+      formData.append('max_quality_iterations', selectedQA);
+
+      try {
+        const response = await fetch(`${API_BASE}/pdf-translator-v2/translate`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        setStep(2, 'done', 'done ✓');
+        setStep(3, 'active', 'running...');
+        progressBar.style.width = '65%';
+
+        await sleep(600);
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+          throw new Error(err.detail || `HTTP ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+
+        const pages = response.headers.get('X-Pages') || '?';
+        const blocks = response.headers.get('X-Blocks-Translated') || '?';
+        const time = response.headers.get('X-Time-Seconds') || '?';
+        const qaIter = parseInt(response.headers.get('X-Quality-Iterations') || '1');
+
+        // Show QA loop if more than 1 iteration
+        if (qaIter > 1) {
+          const qaIndicator = document.getElementById('qa-loop-indicator');
+          qaIndicator.textContent = `↻ Quality gate triggered ${qaIter - 1} retry(s) — translations improved`;
+          qaIndicator.classList.add('show');
+          setStep(3, 'retry', `${qaIter}× verified`);
+        } else {
+          setStep(3, 'done', 'done ✓');
+        }
+
+        setStep(4, 'active', 'running...');
+        progressBar.style.width = '90%';
+        await sleep(400);
+        setStep(4, 'done', 'done ✓');
+        progressBar.style.width = '100%';
+
+        document.getElementById('stat-pages').textContent = pages;
+        document.getElementById('stat-blocks').textContent = blocks;
+        document.getElementById('stat-qa').textContent = qaIter + '×';
+        document.getElementById('stat-time').textContent = time + 's';
+
+        const dlBtn = document.getElementById('download-btn');
+        dlBtn.href = url;
+        dlBtn.download = selectedFile.name.replace('.pdf', '') + `_${selectedLanguage}_v2.pdf`;
+
+        document.getElementById('result-box').classList.add('show');
+
+      } catch (err) {
+        setStep(2, 'error', 'error');
+        setStep(3, 'error', 'error');
+        setStep(4, 'error', 'error');
+        const errorBox = document.getElementById('error-box');
+        errorBox.textContent = `Error: ${err.message}`;
+        errorBox.classList.add('show');
+        progressBar.style.width = '0%';
+      } finally {
+        translateBtn.disabled = false;
+        translateBtn.textContent = 'Translate PDF →';
+        updateBtn();
+      }
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+  </script>
+</body>
+
+</html>

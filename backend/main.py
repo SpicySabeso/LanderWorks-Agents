@@ -6,7 +6,9 @@ from fastapi import BackgroundTasks, FastAPI, Header, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from twilio.request_validator import RequestValidator
 
-from backend.agents.scaffold_web_agent.tenant_cors import ScaffoldTenantCORSMiddleware
+from backend.agents.lead_capture_agent.tenant_cors import ScaffoldTenantCORSMiddleware
+
+from .agents.rag_pdf_agent.api import router as rag_pdf_router
 
 from .agents.dental_agent.agent import respond, route_message
 from .agents.dental_agent.config import settings
@@ -22,7 +24,8 @@ from .agents.dental_agent.store import (
 )
 from .agents.dental_agent.tools import _cfg, _norm_q, validate_config
 from .agents.dental_agent.twilio_worker import process_twilio_message
-from .agents.scaffold_web_agent.api import router as scaffold_agent_router
+from .agents.lead_capture_agent.api import router as lead_capture_agent_router
+from backend.agents.pdf_translator_v2.router import router as pdf_translator_v2_router
 
 
 @asynccontextmanager
@@ -49,7 +52,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Dental Agent", lifespan=lifespan)
 app.add_middleware(ScaffoldTenantCORSMiddleware)
-app.include_router(scaffold_agent_router)
+app.include_router(lead_capture_agent_router)
+app.include_router(rag_pdf_router)
+app.include_router(pdf_translator_v2_router)
 
 
 @app.post("/chat")
@@ -58,17 +63,6 @@ def chat(inp: ChatIn):
     reply, sources = respond(inp.user, sender=inp.sender)
     print("DEBUG respond:", reply, sources, type(sources))
     return {"reply": reply, "sources": sources}
-
-
-@app.post("/admin/reload-config")
-def reload_config():
-    # invalidar caché leyendo una vez
-    from importlib import reload
-
-    import backend.tools as tools
-
-    reload(tools)
-    return {"ok": True}
 
 
 def _validate_twilio(request: Request, form: dict) -> bool:

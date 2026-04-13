@@ -9,7 +9,6 @@ def _asked_price(msg: str) -> bool:
 
 
 def validate_prices_and_sources(user_msg: str, reply: str, sources: list[str]) -> bool:
-    # si preguntan por precio, exige cifra o "desde" y al menos una fuente
     if not _asked_price(user_msg):
         return True
     has_number = bool(re.search(r"\d", reply)) or ("desde" in reply.lower())
