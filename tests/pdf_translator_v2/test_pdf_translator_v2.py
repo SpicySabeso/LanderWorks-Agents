@@ -351,6 +351,9 @@ class TestNumericFilter:
     def test_model_code_filtered(self):
         assert self._fn("WW90T4042CE") is True
 
+    def test_price_no_suffix_filtered(self):
+        assert self._fn("129.99") is True
+
     def test_real_word_not_filtered(self):
         assert self._fn("ANNIVERSARY") is False
 
@@ -360,9 +363,12 @@ class TestNumericFilter:
     def test_offer_not_filtered(self):
         assert self._fn("OFFER") is False
 
-    def test_dimensions_with_text_not_filtered(self):
-        """'277 L Refrigerator | 110 L Freezer' tiene texto real → no filtrar."""
-        assert self._fn("277 L Refrigerator | 110 L Freezer") is False
+    def test_description_not_filtered(self):
+        assert self._fn("Función Vapor Refresh") is False
+
+    def test_mixed_text_with_price_not_filtered(self):
+        # Texto real con precio al final — tiene >30% alfa → no filtrar
+        assert self._fn("AddWash Drum 449.-") is False
 
 
 # ══════════════════════════════════════════════════════════════════════════════

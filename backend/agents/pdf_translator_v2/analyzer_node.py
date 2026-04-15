@@ -376,15 +376,9 @@ def _is_light_color(hex_color: str) -> bool:
 
 def _is_numeric_or_untranslatable(text: str) -> bool:
     """
-    True si el texto NO necesita traducción:
-    - Puramente numérico: "999.-", "1.299,00"
-    - Medida técnica: "1400 r.p.m.", "100 W", "277 L"
-    - Referencia: "Ref.: 1579408"
-    - Código alfanumérico de modelo: "WW90T4042CE" (letras Y números mezclados)
-    - Solo dígitos/símbolos
-
-    NO filtramos palabras en mayúsculas como "ANIVERSARIO", "OFERTA", "NOVEDAD"
-    porque esas SÍ necesitan traducción.
+    True si el texto NO necesita traducción.
+    Usa ratio de caracteres alfabéticos como filtro principal:
+    si menos del 30% son letras reales → es numérico/técnico → skip.
     """
     import re
 
@@ -392,41 +386,25 @@ def _is_numeric_or_untranslatable(text: str) -> bool:
     if not s:
         return True
 
-    # Precio con punto/coma como separador de miles: "1.299.-", "4.299,-", "1,299.00"
-    if re.match(r"^[\d]{1,3}([.,]\d{3})*\s*[\.\-,]{1,2}$", s):
+    # ── Filtro principal: ratio de caracteres alfabéticos ─────────────
+    # "999.-" → 0% alfa → skip
+    # "1400 r.p.m." → 27% alfa → skip
+    # "OFFER" → 100% alfa → traducir
+    # "Función Vapor Refresh" → 95% alfa → traducir
+    alpha_count = sum(1 for c in s if c.isalpha())
+    total = len(s)
+    if total > 0 and alpha_count / total < 0.30:
         return True
 
-    # Referencia de producto
+    # ── Filtros secundarios para casos mixtos ──────────────────────────
+
+    # Referencia de producto: "Ref.: 1579408"
     if re.match(r"^Ref\.?:?\s*[\d\w/-]+$", s, re.IGNORECASE):
         return True
 
-    # Solo dígitos, signos de precio y símbolos (sin letras reales)
-    if re.match(r"^[\d\s.,·€$£%/×xX*()\-+\.°]+$", s):
-        return True
-
-    # Precio: "999.-", "1.299,-", "4,299.-"
-    if re.match(r"^[\d.,]+\s*[\.\-]{1,2}$", s):
-        return True
-
-    # Medida con unidad técnica MUY corta (max 6 chars): "100 W", "277 L", "9 kg"
-    # Pero NO "ANIVERSARIO" ni palabras largas
-    if re.match(r"^[\d.,]+\s+[a-zA-Zµ°./]{1,6}\.?$", s):
-        return True
-
-    # Medida compuesta: "1400 r.p.m.", "203 x 59.5 cm"
-    if re.match(r"^[\d.,]+[\d\s.,×x/\-]*\s*[a-zA-Zµ°./\s]{1,10}\.?$", s):
-        # Verificamos que no tenga más de 3 palabras con letras reales
-        words_with_letters = [w for w in s.split() if any(c.isalpha() for c in w)]
-        if len(words_with_letters) <= 2:
-            return True
-
-    # Código de modelo: mezcla de letras Y números, sin espacios
-    # "WW90T4042CE", "GBV5240APY" — tiene dígitos Y letras entremezclados
+    # Código de modelo alfanumérico: "WW90T4042CE", "GBV5240APY"
+    # (letras Y dígitos mezclados, sin espacios, sin palabras reales)
     if re.match(r"^[A-Za-z]{1,5}\d+[A-Za-z\d]*$", s) and any(c.isdigit() for c in s):
-        return True
-
-    # Solo número con separadores: "1579408", "9823401"
-    if re.match(r"^[\d\-/]+$", s):
         return True
 
     return False

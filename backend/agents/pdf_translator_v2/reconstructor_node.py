@@ -103,10 +103,21 @@ def reconstructor_node(state: TranslationState) -> Dict[str, Any]:
 
         if native_elements:
             for elem in native_elements:
-                page.add_redact_annot(elem.bbox.to_rect(), fill=None)
-
+                rect = elem.bbox.to_rect()
+                # Encogemos el rect de redacción para evitar rozar con texto
+                # adyacente — especialmente fuentes grandes cuyos descenders
+                # se solapan con el ascender del siguiente elemento
+                shrink = max(3.0, elem.font_size * 0.08)
+                safe_rect = fitz.Rect(
+                    rect.x0,
+                    rect.y0 + shrink,
+                    rect.x1,
+                    rect.y1 - shrink,
+                )
+                if safe_rect.is_empty:
+                    safe_rect = rect
+                page.add_redact_annot(safe_rect, fill=None)
             page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
-
             for elem in native_elements:
                 _insert_text(page, elem)
                 native_replaced += 1
@@ -153,6 +164,79 @@ def reconstructor_node(state: TranslationState) -> Dict[str, Any]:
     }
 
 
+def _cover_and_replace(page: fitz.Page, elem: PDFElement) -> None:
+    """
+    Reemplaza el texto original con la traducción sin usar redacciones.
+
+    En vez de add_redact_annot (que puede eliminar contenido adyacente),
+    usamos una secuencia de dos pasos:
+    1. Muestreamos el color de fondo en las esquinas del span (sin texto)
+    2. Dibujamos un rect del color de fondo exacto sobre el texto original
+    3. Insertamos la traducción encima con overlay=True
+
+    Esto garantiza que solo cubrimos el área exacta del span sin afectar
+    elementos cercanos como precios grandes en otro color.
+    """
+    rect = elem.bbox.to_rect()
+
+    # Muestreamos el color de fondo ANTES de cubrir
+    bg_color = _sample_span_background(page, rect)
+
+    # Cubrimos el texto original con un rect del color exacto del fondo
+    shape = page.new_shape()
+    shape.draw_rect(rect)
+    shape.finish(fill=bg_color, color=bg_color, width=0)
+    shape.commit()
+
+    # Insertamos la traducción encima
+    _insert_text(page, elem)
+
+
+def _sample_span_background(page: fitz.Page, rect: fitz.Rect) -> tuple:
+    """
+    Muestrea el color de fondo de un span renderizando solo el área del rect.
+    Toma las 4 esquinas (donde raramente hay texto) para estimar el fondo.
+
+    Returns: (r, g, b) con valores 0.0 - 1.0
+    """
+    try:
+        clip = fitz.Rect(
+            max(0, rect.x0),
+            max(0, rect.y0),
+            min(page.rect.width, rect.x1),
+            min(page.rect.height, rect.y1),
+        )
+        # Renderizamos a 72 DPI — suficiente para detectar color, muy rápido
+        pix = page.get_pixmap(matrix=fitz.Matrix(1.0, 1.0), clip=clip, alpha=False)
+        if pix.width < 2 or pix.height < 2:
+            return (1.0, 1.0, 1.0)
+
+        samples = pix.samples
+        w, h = pix.width, pix.height
+
+        # Muestreamos las 4 esquinas — generalmente son fondo puro
+        corners = [
+            (0, 0),
+            (w - 1, 0),
+            (0, h - 1),
+            (w - 1, h - 1),
+        ]
+        tr = tg = tb = 0.0
+        count = 0
+        for cx, cy in corners:
+            idx = (cy * w + cx) * 3
+            if idx + 2 < len(samples):
+                tr += samples[idx] / 255.0
+                tg += samples[idx + 1] / 255.0
+                tb += samples[idx + 2] / 255.0
+                count += 1
+
+        return (tr / count, tg / count, tb / count) if count else (1.0, 1.0, 1.0)
+
+    except Exception:
+        return (1.0, 1.0, 1.0)
+
+
 def _insert_text(page: fitz.Page, elem: PDFElement) -> None:
     """
     Inserta texto traducido en la posición exacta del span original.
@@ -165,11 +249,9 @@ def _insert_text(page: fitz.Page, elem: PDFElement) -> None:
     """
     text = elem.translated_text
     font = _select_font(elem)
+    # Preservamos el color original del span — con fill=None el fondo
+    # original se mantiene, así el contraste siempre es correcto
     color = _int_color_to_rgb(elem.text_color)
-
-    lum = color[0] * 0.299 + color[1] * 0.587 + color[2] * 0.114
-    if lum > 0.85:
-        color = (0.05, 0.05, 0.05)
 
     rect = elem.bbox.to_rect()
     original_size = max(elem.font_size, 4.0)
@@ -181,13 +263,13 @@ def _insert_text(page: fitz.Page, elem: PDFElement) -> None:
     size = max(original_size * 0.55, min(original_size, size_one_line))
     size = max(4.0, size)
 
-    # Baseline: y1 del bbox del span = posición exacta del baseline original
-    # Esto alinea el texto traducido exactamente donde estaba el original
-    x = rect.x0
-    baseline_y = rect.y1
+    # Baseline: y1 del bbox menos el descender estimado
+    # Evita que el texto reinsertado tape elementos adyacentes de abajo
+    descender = size * 0.2
+    baseline_y = rect.y1 - descender
 
     page.insert_text(
-        point=fitz.Point(x, baseline_y),
+        point=fitz.Point(rect.x0, baseline_y),
         text=text,
         fontname=font,
         fontsize=size,
