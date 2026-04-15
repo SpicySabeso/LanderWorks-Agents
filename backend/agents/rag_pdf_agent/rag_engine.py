@@ -63,11 +63,16 @@ COMPARE_PDF_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """Eres un asistente que compara y analiza dos documentos PDF simultáneamente.
-Responde basándote ÚNICAMENTE en los contextos proporcionados.
-Cuando sea relevante, indica de qué documento proviene cada información (Documento A o Documento B).
-Si la información no está en ninguno de los documentos, dilo explícitamente.
-Responde en el mismo idioma que la pregunta.
+            """You are an assistant that compares and analyzes two PDF documents simultaneously.
+Answer based ONLY on the provided contexts.
+Always attribute information to the correct document (Document A or Document B).
+If information is not found in either document, say so explicitly.
+IMPORTANT: Always respond in the same language as the user's question.
+
+When comparing the two documents, structure your response as:
+1. A brief summary of each document's approach
+2. A markdown comparison table with the key differences
+3. A short conclusion
 
 Contexto del Documento A:
 {context_a}
@@ -120,14 +125,25 @@ def _build_history(chat_history: list[dict]) -> list:
 
 
 def _clean_chunk_text(text: str) -> str:
-    """Elimina líneas que son solo números o muy cortas (datos de tablas)."""
+    """Elimina líneas de bibliografía, listas de autores y URLs."""
     lines = text.split("\n")
-    clean = [
-        l
-        for l in lines
-        if len(l.strip()) > 15 and not l.strip().replace(".", "").replace(" ", "").isdigit()
-    ]
-    return " ".join(clean[:8])
+    clean = []
+    for l in lines:
+        stripped = l.strip()
+        if len(stripped) < 20:
+            continue
+        if stripped.replace(".", "").replace(" ", "").isdigit():
+            continue
+        if stripped.startswith("[") and "]" in stripped:
+            continue  # citas tipo [Autor, 2022]
+        if stripped.startswith("http"):
+            continue  # URLs
+        if stripped.count(",") > 4:
+            continue  # listas de autores separados por comas
+        if "@" in stripped:
+            continue  # emails
+        clean.append(stripped)
+    return " ".join(clean[:6])
 
 
 def _build_sources(docs) -> list[dict]:
