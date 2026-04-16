@@ -4,6 +4,14 @@ A production-quality PDF translation agent built with LangGraph. Translates PDFs
 
 ---
 
+## The Problem
+
+Translating a PDF with standard tools — Google Translate, ChatGPT, or copy-paste — destroys the document structure. Text gets extracted as a flat string, columns collapse, tables break, and the result is unreadable.
+
+This agent solves that. It extracts every text element **span by span** with its exact position, font, size, and color. It translates the content using Claude Haiku. Then it reconstructs the PDF inserting each translated block back at the **exact original coordinates** — same columns, same headers, same layout. The output is a translated PDF that looks like it was designed that way from the start.
+
+---
+
 ## Architecture
 
 ```
