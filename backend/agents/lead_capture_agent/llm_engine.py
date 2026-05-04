@@ -226,7 +226,7 @@ def stream_user_message_llm(
 
             # Si el buffer empieza a parecerse al marcador, esperamos
             # Ejemplo: buffer = "<<<" — podria ser el inicio del marcador
-            if any(_LEAD_MARKER.startswith(marker_buffer) and marker_buffer):
+            if _LEAD_MARKER.startswith(marker_buffer) and marker_buffer:
                 continue
 
             # Buffer seguro — enviamos y vaciamos
