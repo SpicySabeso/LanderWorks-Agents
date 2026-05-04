@@ -35,8 +35,6 @@ def widget_js() -> str:
   })();
 
   var SID_KEY = "scaffold_widget_session_id_" + (TOKEN || "no_token");
-  // Controla si el saludo inicial ya se pidió en esta página
-  // (evita pedirlo de nuevo si el usuario cierra y vuelve a abrir el widget)
   var _greeted = false;
 
   function uuid() {
@@ -157,7 +155,7 @@ def widget_js() -> str:
     row.appendChild(b);
     chat.appendChild(row);
     chat.scrollTop = chat.scrollHeight;
-    return b; // devuelve el nodo para poder modificarlo (ej: loading)
+    return b;
   }
 
   var composer = el("div");
@@ -203,11 +201,11 @@ def widget_js() -> str:
   document.body.appendChild(btn);
   document.body.appendChild(panel);
 
-  // ---- lógica de red ----
+  // ---- logica de red ----
 
   async function postMessage(text) {
     var sid = getSessionId();
-    var url = API_BASE + "/scaffold-agent/chat?token=" + encodeURIComponent(TOKEN);
+    var url = API_BASE + "/scaffold-agent/chat/stream?token=" + encodeURIComponent(TOKEN);
 
     var res = await fetch(url, {
       method: "POST",
@@ -220,7 +218,6 @@ def widget_js() -> str:
 
     if (!res.ok) {
       var fallback = "Something went wrong while processing your request.\nPlease try again in a few minutes.";
-
       if (res.status === 401) {
         fallback = "This widget is not configured correctly for this website.\nPlease contact the site owner.";
       } else if (res.status === 403) {
@@ -230,22 +227,39 @@ def widget_js() -> str:
       } else if (res.status >= 500) {
         fallback = "Something went wrong sending your request.\nPlease try again in a few minutes or contact the company directly.";
       }
-
       bubble(fallback, "bot");
       return;
     }
 
-    var data = await res.json();
-    bubble(data.reply || "(no reply)", "bot");
+    // Burbuja vacia que vamos llenando chunk a chunk
+    var botBubble = bubble("", "bot");
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+
+    while (true) {
+      var result = await reader.read();
+      if (result.done) break;
+
+      var chunk = decoder.decode(result.value);
+      var lines = chunk.split("\n").filter(function(l) { return l.startsWith("data: "); });
+
+      for (var i = 0; i < lines.length; i++) {
+        try {
+          var data = JSON.parse(lines[i].replace("data: ", ""));
+          if (data.chunk) {
+            botBubble.textContent += data.chunk;
+            chat.scrollTop = chat.scrollHeight;
+          }
+        } catch(e) {}
+      }
+    }
   }
 
   // Pide el saludo al servidor la primera vez que se abre el widget.
-  // Muestra "..." mientras espera y lo reemplaza con la respuesta real.
   async function fetchGreeting() {
     var sid = getSessionId();
     var url = API_BASE + "/scaffold-agent/chat?token=" + encodeURIComponent(TOKEN);
 
-    // Burbuja de "escribiendo..." mientras carga
     var loadingNode = bubble("...", "bot");
     send.disabled = true;
     input.disabled = true;
@@ -283,7 +297,6 @@ def widget_js() -> str:
   function toggle(open) {
     panel.style.display = open ? "block" : "none";
     if (open) {
-      // Pide el saludo al LLM la primera vez que se abre
       if (!_greeted) {
         _greeted = true;
         fetchGreeting();
