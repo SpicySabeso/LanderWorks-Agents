@@ -1,45 +1,89 @@
 # AI Lead Capture SaaS Platform
 
-A multi-tenant SaaS platform for deploying AI-powered lead capture agents on any website. Each client (tenant) gets their own embeddable chat widget, powered by Claude, trained on their own business knowledge.
+Multi-tenant SaaS platform that deploys AI-powered lead capture agents on any website with a single `<script>` tag. Each client gets their own isolated agent trained on their business knowledge, with automatic lead capture, email delivery, and full LLM observability via Langfuse.
 
-Built as a portfolio project to demonstrate real-world AI engineering skills: multi-tenant architecture, LLM integration, production deployment, and automated lead delivery.
-
-**Live demo:** [dental-agent-bn18.onrender.com/scaffold-agent/demo?token=tok_synapse_demo_001](https://dental-agent-bn18.onrender.com/scaffold-agent/demo?token=tok_synapse_demo_001)
+**Portfolio:** [notion.so/Lander-Iglesias-ed9bca668ca08368ab0c81aed0869e1d](https://www.notion.so/Lander-Iglesias-ed9bca668ca08368ab0c81aed0869e1d)
 
 ---
 
-## What it does
+## The problem
 
-- Embeddable chat widget installable on any website with a single `<script>` tag
-- Each tenant has their own knowledge base — the agent answers questions about their specific business
-- Captures leads naturally: collects visitor email and need through conversation
-- Delivers leads by email to the tenant's inbox when the visitor confirms
-- Admin panel to manage tenants, inspect sessions, analytics, leads, and events
+Businesses need to capture leads from website visitors 24/7 — but generic chatbots feel robotic, and custom solutions are expensive to build and maintain per client. There's no easy way to deploy a knowledge-trained AI agent on a client's website without code changes, and no visibility into what the agent is actually doing in production.
+
+---
+
+## Solution
+
+A multi-tenant platform where each client (tenant) gets their own AI agent configured with their business knowledge. The agent is deployed on any website with a single `<script>` tag — no backend changes required. Every conversation is traced in Langfuse for full LLM observability.
 
 ---
 
 ## Architecture
 
 ```
-Browser widget (JS)
-      │
-      ▼
-FastAPI backend
-      │
-      ├── /scaffold-agent/chat          ← widget sends messages here
-      ├── /scaffold-agent/admin/page    ← admin panel UI
-      ├── /scaffold-agent/admin/*       ← admin API (token protected)
-      └── /scaffold-agent/widget.js     ← embeddable widget script
-            │
-            ├── LLM Engine (Claude Haiku)   ← tenants with knowledge_text
-            └── Rules Engine                ← tenants without knowledge_text
+Client website (any domain)
+       │
+       ▼
+  <script> widget tag
+       │
+       ▼
+  FastAPI backend
+       │
+  ┌────┴────────────────────┐
+  │                         │
+  ▼                         ▼
+Token validation      Tenant lookup (SQLite)
+  │                         │
+  └────────┬────────────────┘
+           │
+    knowledge_text injected
+    as Claude system prompt
+           │
+           ▼
+      Claude Haiku
+  (tenant-specific agent)
+           │
+    ┌──────┴──────────┐
+    │                 │
+    ▼                 ▼
+Lead captured    Langfuse trace
+(email saved)    (tokens, latency,
+    │             metadata logged)
+    ▼
+Email delivered
+via Resend
 ```
 
-**Multi-tenant routing:** each request is authenticated by `widget_token`. The backend resolves the tenant, loads their `knowledge_text`, and routes to the correct engine.
+---
 
-**Conversation persistence:** full message history is stored per session in SQLite, so the LLM has context across messages.
+## Key features
 
-**Lead pipeline:** when the LLM collects an email and the visitor confirms, the agent saves the lead to the database and sends it by email to the tenant's inbox.
+**Multi-tenant isolation**
+Each client has their own token, knowledge base, allowed origins, and conversation sessions. One platform, unlimited clients. Tenants are managed via an admin panel — no code changes needed to onboard a new client.
+
+**Single script deployment**
+```html
+<script src="https://your-domain.com/scaffold-agent/widget.js?token=tok_client_123"></script>
+```
+The widget loads automatically on any website with zero backend changes on the client's side.
+
+**Per-tenant Claude agents**
+Each tenant's `knowledge_text` is injected as Claude's system prompt. The agent answers as a specialist for that specific business — services, pricing, hours, FAQs — without knowing anything about other tenants.
+
+**LLM Observability with Langfuse**
+Every conversation is traced in Langfuse:
+- Token usage per message and per session
+- Latency tracking per LLM call
+- Input/output logged for quality monitoring
+- Conversation metadata (tenant, session, lead status)
+
+This is what separates a prototype from a production system — you can't improve what you can't measure.
+
+**Automatic lead capture**
+The agent identifies when a visitor provides their email through natural conversation. The lead is confirmed, saved to SQLite, and delivered to the client via email (Resend).
+
+**Admin panel**
+Tenant management, per-tenant analytics, token rotation and revocation, session and lead inspection.
 
 ---
 
@@ -47,156 +91,77 @@ FastAPI backend
 
 | Layer | Technology |
 |---|---|
-| Backend | Python, FastAPI, Uvicorn |
-| AI | Anthropic Claude Haiku (claude-haiku-4-5) |
-| Database | SQLite (via custom store with auto-migrations) |
-| Email | Resend |
-| Frontend | Vanilla JS widget, embedded HTML admin panel |
-| Deploy | Render (auto-deploy from GitHub) |
-| Testing | pytest, with mocked Anthropic API |
-| Linting | Ruff + pre-commit hooks |
+| LLM | Anthropic Claude Haiku |
+| LLM Observability | Langfuse |
+| Backend | FastAPI, Python 3.12 |
+| Database | SQLite |
+| Email delivery | Resend |
+| Deployment | Render |
+| CI/CD | GitHub Actions |
+| Code quality | ruff, Black, pytest, gitleaks |
+
+---
+
+## Key technical decisions
+
+**Why Langfuse for observability?**
+Langfuse is the standard LLMOps tool for tracing LLM applications. It gives token-level visibility without changing the agent's logic. The API in v4.x: `langfuse.trace().generation()` — not `langfuse.decorators` which doesn't exist in that version.
+
+**Why inject knowledge as system prompt instead of RAG?**
+For short business knowledge (services, pricing, FAQs), a system prompt is simpler, faster, and cheaper than a full RAG pipeline. RAG makes sense when the knowledge base is too large to fit in a prompt. For typical SMB clients, the system prompt approach is the right trade-off.
+
+**Why token-based auth instead of OAuth?**
+The widget runs on third-party websites that don't share a session with our backend. Tokens are simple, stateless, and easy to rotate without requiring the client to change their embed code.
+
+**Why SQLite instead of PostgreSQL?**
+This agent runs on Render's free tier where the filesystem is ephemeral. SQLite is sufficient for the load. For production at scale, migration to PostgreSQL is straightforward via SQLAlchemy.
+
+---
+
+## Limitations
+
+- **Render ephemeral storage.** SQLite data is lost on redeploy. Re-create tenants via the admin panel after redeploy.
+- **No conversation memory across sessions.** Each new page load starts a fresh conversation.
+- **Langfuse adds ~50ms latency per trace.** Acceptable for conversational agents. Can be made async if needed.
+
+---
+
+## Running locally
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env
+# Fill in: ANTHROPIC_API_KEY, RESEND_API_KEY, ADMIN_TOKEN,
+#          LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST
+
+uvicorn backend.main:app --reload --port 8000
+```
+
+---
+
+## Environment variables
+
+| Variable | Required for |
+|---|---|
+| `ANTHROPIC_API_KEY` | Claude Haiku calls |
+| `RESEND_API_KEY` | Email delivery |
+| `ADMIN_TOKEN` | Admin panel access |
+| `LANGFUSE_PUBLIC_KEY` | Langfuse tracing |
+| `LANGFUSE_SECRET_KEY` | Langfuse tracing |
+| `LANGFUSE_HOST` | Langfuse endpoint (default: cloud.langfuse.com) |
 
 ---
 
 ## Project structure
 
 ```
-backend/
-├── main.py                          # FastAPI app entrypoint
-├── apps/
-│   └── scaffold_web_agent/
-│       ├── api.py                   # All routes
-│       ├── llm_engine.py            # Claude-powered conversation engine
-│       ├── engine.py                # Rule-based engine (fallback)
-│       ├── chat_service.py          # Routes to LLM or rules engine
-│       ├── domain.py                # SessionState, Step, CaseData models
-│       ├── sqlite_store.py          # SQLite persistence + auto-migrations
-│       ├── tenant_service.py        # Tenant CRUD
-│       ├── session_service.py       # Session management
-│       ├── lead_service.py          # Lead storage
-│       ├── analytics_service.py     # Session analytics
-│       ├── event_service.py         # Event logging
-│       ├── delivery_service.py      # Lead email delivery
-│       ├── admin_template.py        # Admin panel HTML/JS
-│       ├── widget_template.py       # Embeddable chat widget JS
-│       └── demo_template.py         # Demo page
-├── data/
-│   └── synapse_labs_knowledge.md    # Example knowledge base
-scripts/
-└── create_scaffold_tenant.py        # CLI to create/update tenants
-tests/
-└── test_llm_engine.py               # LLM engine, routing, serialization tests
+backend/agents/lead_capture_agent/
+├── api.py              # FastAPI endpoints and widget serving
+├── llm_engine.py       # Claude integration + Langfuse tracing
+├── tenant_store.py     # SQLite tenant management
+├── session_state.py    # In-memory conversation history
+├── lead_store.py       # Lead capture and storage
+├── email_service.py    # Resend email delivery
+├── admin_panel.py      # Admin UI and API
+└── tenant_cors.py      # Per-tenant CORS middleware
 ```
-
----
-
-## Code Quality & Security
-
-This project enforces code quality and security standards automatically via pre-commit hooks:
-
-| Tool | Purpose |
-|------|---------|
-| 🔒 **Gitleaks** | Prevents secrets and API keys from being committed |
-| ⚫ **Black** | Enforces consistent code formatting |
-| ⚡ **Ruff** | Fast Python linter for code quality |
-| 🧪 **Pytest** | Runs test suite before every commit |
-
-To set up the hooks locally:
-```bash
-pip install pre-commit
-pre-commit install
-```
-
----
-
-## Running locally
-
-**1. Clone and install dependencies**
-
-```bash
-git clone https://github.com/SpicySabeso/LanderWorks-Agents
-cd dental-agent
-pip install -r requirements.txt
-```
-
-**2. Set up environment variables**
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-
-```
-ANTHROPIC_API_KEY=sk-ant-...
-ADMIN_TOKEN=your-secret-admin-token
-```
-
-**3. Start the server**
-
-```bash
-uvicorn backend.main:app --reload --port 8000
-```
-
-**4. Create a tenant**
-
-```bash
-python scripts/create_scaffold_tenant.py \
-  http://localhost:8000 \
-  your-admin-token \
-  demo \
-  youremail@example.com \
-  "http://localhost:8000" \
-  --knowledge backend/data/synapse_labs_knowledge.md
-```
-
-**5. Open the demo**
-
-```
-http://localhost:8000/scaffold-agent/demo?token=<widget_token_from_step_4>
-```
-
----
-
-## Admin panel
-
-Access at `/scaffold-agent/admin/page`. Enter the base URL and admin token to manage tenants.
-
-Each tenant card exposes:
-- **Analytics** — session counts, lead conversion rate
-- **Sessions** — full session history with state JSON
-- **Leads** — captured leads with email, topic, and conversation summary
-- **Events** — detailed event log per session
-- **Knowledge** — the business knowledge text powering the agent
-- **Rotate token** — generate a new widget token (invalidates the old one)
-- **Revoke token** — disable the widget immediately
-
----
-
-## Installing the widget on any website
-
-After creating a tenant, add one line to any HTML page:
-
-```html
-<script src="https://dental-agent-bn18.onrender.com/scaffold-agent/widget.js?token=YOUR_WIDGET_TOKEN"></script>
-```
-
----
-
-## Running tests
-
-```bash
-pytest tests/ -v
-```
-
-Tests cover: LLM engine responses, lead marker detection, email extraction, chat service routing (LLM vs rules), SQLite serialization, and backward compatibility with old sessions.
-
----
-
-## Environment variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API key for Claude Haiku |
-| `ADMIN_TOKEN` | Yes | Secret token to access the admin API |
-| `SCAFFOLD_INBOX_EMAIL` | No | Default inbox (overridden per tenant) |
