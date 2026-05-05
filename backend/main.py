@@ -24,8 +24,15 @@ from .agents.dental_agent.store import (
 )
 from .agents.dental_agent.tools import _cfg, _norm_q, validate_config
 from .agents.dental_agent.twilio_worker import process_twilio_message
-from .agents.doc_intel_agent.api import router as doc_intel_router
-from .agents.doc_intel_agent.database import init_db as init_doc_intel_db
+
+try:
+    from .agents.doc_intel_agent.api import router as doc_intel_router
+    from .agents.doc_intel_agent.database import init_db as init_doc_intel_db
+
+    DOC_INTEL_AVAILABLE = True
+except Exception as e:
+    print(f"[DOC_INTEL] No disponible: {e}")
+    DOC_INTEL_AVAILABLE = False
 from .agents.lead_capture_agent.api import router as lead_capture_agent_router
 from .agents.rag_pdf_agent.api import router as rag_pdf_router
 
@@ -49,7 +56,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print("[CONFIG] fallo validando config:", e)
 
-    init_doc_intel_db()
+    if DOC_INTEL_AVAILABLE:
+        try:
+            init_doc_intel_db()
+            print("[DOC_INTEL] Base de datos inicializada")
+        except Exception as e:
+            print(f"[DOC_INTEL] fallo al inicializar BD: {e}")
 
     yield
 
@@ -60,7 +72,8 @@ app.include_router(lead_capture_agent_router)
 app.include_router(rag_pdf_router)
 app.include_router(pdf_translator_v2_router)
 app.include_router(bi_agent_router)
-app.include_router(doc_intel_router)
+if DOC_INTEL_AVAILABLE:
+    app.include_router(doc_intel_router)
 
 
 @app.post("/chat")
