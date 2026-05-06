@@ -19,9 +19,9 @@ Conversational AI agent that handles patient inquiries on WhatsApp, collects str
 ---
 
 ### 2. AI Lead Capture SaaS Platform
-Multi-tenant SaaS platform that deploys custom AI agents on any website with a single `<script>` tag. Each client gets their own agent trained on their business knowledge, with automatic lead capture and email delivery. Integrated with **Langfuse** for LLM observability — every conversation traces tokens, latency and metadata.
+Multi-tenant SaaS platform that deploys custom AI agents on any website with a single `<script>` tag. Features streaming responses (SSE), LLM observability via Langfuse, and is deployed on both AWS EC2 and Azure App Service.
 
-**Tech:** Python · FastAPI · Claude Haiku · SQLite · Resend · Langfuse · Render  
+**Tech:** Python · FastAPI · Claude Haiku · SQLite · Resend · Langfuse · Streaming SSE · Render · AWS EC2 · Azure App Service  
 **[View project →](backend/agents/lead_capture_agent/)**
 
 ---
@@ -75,6 +75,7 @@ Production-grade document Q&A system. Upload PDFs, ask questions in natural lang
 |---|---|
 | Python 3.12 | All agents |
 | FastAPI | REST API for all agents |
+| Streaming SSE | Progressive streaming responses (Lead Capture Agent) |
 | Pydantic | Data validation and schemas |
 | PyMuPDF | PDF parsing, text extraction span-by-span, PDF reconstruction |
 | Pillow | Pixel-level image manipulation |
@@ -97,8 +98,11 @@ Production-grade document Q&A system. Upload PDFs, ask questions in natural lang
 | Tool | Used for |
 |---|---|
 | Docker + docker-compose | Containerization — Document Intelligence Agent |
-| AWS EC2 | Cloud deployment — FastAPI agents on t3.micro (eu-west-1) |
+| AWS EC2 | Cloud deployment — t3.micro (eu-west-1) |
 | AWS IAM | User management and access control |
+| AWS ECR | Container registry |
+| Azure App Service | PaaS deployment — Lead Capture Agent (B1, West Europe) |
+| Azure Container Registry (ACR) | Private Docker image registry |
 | Cloudflare R2 | S3-compatible persistent PDF storage |
 | Render | Production deployment for non-containerized agents |
 | GitHub Actions | CI/CD — auto-deploy on push |
@@ -121,7 +125,7 @@ backend/
 ├── main.py                  # FastAPI app entrypoint
 └── agents/
     ├── dental_agent/        # WhatsApp agent for clinics
-    ├── lead_capture_agent/  # Multi-tenant lead capture SaaS + Langfuse
+    ├── lead_capture_agent/  # Multi-tenant lead capture SaaS + Langfuse + SSE
     ├── rag_pdf_agent/       # RAG PDF chat agent
     ├── pdf_translator_v2/   # LangGraph PDF translation pipeline
     ├── bi_agent/            # Multi-agent BI analytics (LangGraph)
